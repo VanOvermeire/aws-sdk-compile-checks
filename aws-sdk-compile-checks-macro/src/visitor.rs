@@ -1,3 +1,5 @@
+use std::collections::{HashMap, HashSet};
+
 use proc_macro2::{Ident, Span};
 use syn::{Expr, ExprMethodCall, FnArg, ItemFn, Local, Member, Pat, Signature, Type, visit};
 use syn::visit::Visit;
@@ -9,7 +11,7 @@ const AWS_SDK_PREFIX: &str = "aws_sdk_"; // e.g. aws_sdk_sqs::Client
 
 #[derive(Debug)]
 pub(crate) struct MethodVisitor {
-    client: Option<Client>,
+    clients: HashSet<Client>,
     method_calls: Vec<MethodCallWithReceiver>,
     required_props: RequiredPropertiesMap,
 }
@@ -42,7 +44,7 @@ struct MethodCallWithReceiver {
     receiver: Option<Ident>,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Eq, Hash)]
 struct Client {
     name: Option<String>,
     sdk: Option<String>,
@@ -51,7 +53,7 @@ struct Client {
 impl MethodVisitor {
     pub(crate) fn new(item: &ItemFn, checks: RequiredPropertiesMap) -> Self {
         let mut visitor = Self {
-            client: analyze_signature(&item.sig),
+            clients: analyze_signature(&item.sig),
             method_calls: vec![],
             required_props: checks,
         };
@@ -89,12 +91,12 @@ impl MethodVisitor {
                 })
                 .collect();
 
-            if let (Some(Client{ name: Some(client_name), ..}), Some(receiver)) = (&self.client, &sdk_function_call.receiver) {
-                if client_name != &receiver.to_string() {
-                    // we know the client name, and it does not match the receiver, meaning this is not a relevant function call - skip it
+            if let Some(receiver) = &sdk_function_call.receiver {
+                if !self.clients.is_empty() && !self.clients.iter().filter_map(|c| c.name.to_owned()).collect::<Vec<String>>().contains(&&receiver.to_string()) {
+                    // we have clients and none of them match the receiver, meaning this probably isn't a relevant function
                     skip_until_relevant_function_call.drain(0..arguments_for_function.len());
                     initial = skip_until_relevant_function_call;
-                    continue
+                    continue;
                 }
             }
 
@@ -170,42 +172,49 @@ impl MethodVisitor {
                     }
                 }
 
-                let fallback_client = Client {
-                    name: function_call.receiver.as_ref().map(|s| s.to_string()),
-                    sdk: None,
-                };
-                let client = if let Some(client) = self.client.as_ref() {
-                    client
+                let mut client_results: Vec<Vec<&str>> = self.clients
+                    .iter()
+                    .filter_map(|c| self.find_required_props_for_client(hashmaps_with_required_props, c))
+                    .collect();
+
+                if !client_results.is_empty() {
+                    // ideally, would somehow determine which is the best
+                    Ok(client_results.pop().unwrap())
                 } else {
-                    &fallback_client
-                };
-
-                // multiple options -> try to pick the right one
-                match client {
-                    Client { sdk: Some(sdk), .. } if hashmaps_with_required_props.contains_key(&sdk.to_string().as_ref()) => {
-                        Ok(hashmaps_with_required_props
-                            .get(&sdk.to_string().as_ref())
-                            .expect("just checked that this key is present")
-                            .to_owned())
-                    }
-                    Client { name: Some(name), .. } => {
-                        let client_name_prefix = name.replace("client", "").replace('_', "");
-
-                        if hashmaps_with_required_props.contains_key(&client_name_prefix.as_ref()) {
-                            Ok(hashmaps_with_required_props
-                                .get(&client_name_prefix.as_ref())
-                                .expect("just checked that this key is present")
-                                .to_owned())
-                        } else {
-                            Err(hashmaps_with_required_props.keys().map(|key| key.to_string()).collect())
-                        }
-                    }
-                    _ => {
-                        // no info, abort
-                        Err(hashmaps_with_required_props.keys().map(|key| key.to_string()).collect())
-                    }
+                    // still no luck, try a fallback if possible
+                    let fallback_client = Client {
+                        name: function_call.receiver.as_ref().map(|s| s.to_string()),
+                        sdk: None,
+                    };
+                    self.find_required_props_for_client(hashmaps_with_required_props, &fallback_client)
+                        .map(|v| Ok(v))
+                        .unwrap_or_else(|| Err(hashmaps_with_required_props.keys().map(|key| key.to_string()).collect()))
                 }
             }
+        }
+    }
+
+    fn find_required_props_for_client<'a>(&self, hashmaps_with_required_props: &HashMap<&'a str, Vec<&'a str>>, client: &Client) -> Option<Vec<&'a str>> {
+        match client {
+            Client { sdk: Some(sdk), .. } if hashmaps_with_required_props.contains_key(&sdk.to_string().as_ref()) => {
+                Some(hashmaps_with_required_props
+                    .get(&sdk.to_string().as_ref())
+                    .expect("just checked that this key is present")
+                    .to_owned())
+            }
+            Client { name: Some(name), .. } => {
+                let client_name_prefix = name.replace("client", "").replace('_', "");
+
+                if hashmaps_with_required_props.contains_key(&client_name_prefix.as_ref()) {
+                    Some(hashmaps_with_required_props
+                        .get(&client_name_prefix.as_ref())
+                        .expect("just checked that this key is present")
+                        .to_owned())
+                } else {
+                    None
+                }
+            }
+            _ => None
         }
     }
 }
@@ -266,7 +275,7 @@ impl<'ast> Visit<'ast> for MethodVisitor {
                                     _ => None,
                                 };
 
-                                self.client = Some(Client { name, sdk: aws_sdk });
+                                self.clients.insert(Client { name, sdk: aws_sdk });
                             }
                         }
                         _ => {}
@@ -280,7 +289,7 @@ impl<'ast> Visit<'ast> for MethodVisitor {
     }
 }
 
-fn analyze_signature(sig: &Signature) -> Option<Client> {
+fn analyze_signature(sig: &Signature) -> HashSet<Client> {
     sig.inputs
         .iter()
         .filter_map(|i| {
@@ -319,13 +328,13 @@ fn analyze_signature(sig: &Signature) -> Option<Client> {
                 _ => None,
             }
         })
-        .next()
+        .collect()
 }
 
 #[cfg(test)]
 mod test {
     use core::default::Default;
-    use std::collections::HashMap;
+    use std::collections::{HashMap, HashSet};
 
     use proc_macro2::{Ident, Span};
     use quote::quote;
@@ -339,7 +348,7 @@ mod test {
     fn visit_expr_method_call_relevant_aws_sdk_call() {
         let statement: Stmt = syn::parse2(quote!(sqs_client.receive_message().queue_url(queue_url).send();)).unwrap();
         let mut visitor = MethodVisitor {
-            client: None,
+            clients: HashSet::new(),
             method_calls: vec![],
             required_props: Default::default(),
         };
@@ -372,7 +381,7 @@ mod test {
     fn visit_expr_method_call_other_method_call() {
         let statement: Stmt = syn::parse2(quote!(some_thing.to_string();)).unwrap();
         let mut visitor = MethodVisitor {
-            client: None,
+            clients: HashSet::new(),
             method_calls: vec![],
             required_props: Default::default(),
         };
@@ -395,7 +404,7 @@ mod test {
     fn visit_expr_method_call_method_call_with_self() {
         let statement: Stmt = syn::parse2(quote!(self.sqs_client.receive_message().queue_url(queue_url).send();)).unwrap();
         let mut visitor = MethodVisitor {
-            client: None,
+            clients: HashSet::new(),
             method_calls: vec![],
             required_props: Default::default(),
         };
@@ -428,7 +437,7 @@ mod test {
     fn visit_local_init_full_client() {
         let statement: Stmt = syn::parse2(quote!(let a_client = aws_sdk_sqs::Client::new();)).unwrap();
         let mut visitor = MethodVisitor {
-            client: None,
+            clients: HashSet::new(),
             method_calls: vec![],
             required_props: Default::default(),
         };
@@ -439,11 +448,11 @@ mod test {
         };
 
         assert_eq!(
-            visitor.client,
-            Some(Client {
+            visitor.clients,
+            HashSet::from([Client {
                 name: Some("a_client".to_string()),
                 sdk: Some("sqs".to_string()),
-            })
+            }])
         );
     }
 
@@ -451,7 +460,7 @@ mod test {
     fn visit_local_init_simple_client() {
         let statement: Stmt = syn::parse2(quote!(let simple_client = Client::new();)).unwrap();
         let mut visitor = MethodVisitor {
-            client: None,
+            clients: HashSet::new(),
             method_calls: vec![],
             required_props: Default::default(),
         };
@@ -462,11 +471,11 @@ mod test {
         };
 
         assert_eq!(
-            visitor.client,
-            Some(Client {
+            visitor.clients,
+            HashSet::from([Client {
                 name: Some("simple_client".to_string()),
                 sdk: None,
-            })
+            }])
         );
     }
 
@@ -474,7 +483,7 @@ mod test {
     fn analyze_local_init_no_client() {
         let statement: Stmt = syn::parse2(quote!(let simple_client = vec![];)).unwrap();
         let mut visitor = MethodVisitor {
-            client: None,
+            clients: HashSet::new(),
             method_calls: vec![],
             required_props: Default::default(),
         };
@@ -484,7 +493,7 @@ mod test {
             _ => unreachable!("the above creates and parses a local init"),
         };
 
-        assert!(visitor.client.is_none());
+        assert!(visitor.clients.is_empty());
     }
 
     #[test]
@@ -495,10 +504,10 @@ mod test {
 
         assert_eq!(
             actual,
-            Some(Client {
+            HashSet::from([Client {
                 name: Some("a_client".to_string()),
                 sdk: Some("s3".to_string()),
-            })
+            }])
         );
     }
 
@@ -510,10 +519,10 @@ mod test {
 
         assert_eq!(
             actual,
-            Some(Client {
+            HashSet::from([Client {
                 name: Some("a_client".to_string()),
                 sdk: Some("s3".to_string()),
-            })
+            }])
         );
     }
 
@@ -525,10 +534,10 @@ mod test {
 
         assert_eq!(
             actual,
-            Some(Client {
+            HashSet::from([Client {
                 name: Some("simple_client".to_string()),
                 sdk: None,
-            })
+            }])
         );
     }
 
@@ -538,7 +547,7 @@ mod test {
 
         let actual = analyze_signature(&sig);
 
-        assert!(actual.is_none());
+        assert!(actual.is_empty());
     }
 
     #[test]
@@ -547,7 +556,7 @@ mod test {
 
         let actual = analyze_signature(&sig);
 
-        assert!(actual.is_none());
+        assert!(actual.is_empty());
     }
 
     #[test]
@@ -555,7 +564,7 @@ mod test {
         let mut required_props = HashMap::new();
         required_props.insert("some_call", HashMap::from([("s3", vec!["required_call"])]));
         let visitor = MethodVisitor {
-            client: None,
+            clients: HashSet::new(),
             method_calls: vec![],
             required_props,
         };
@@ -577,7 +586,7 @@ mod test {
             HashMap::from([("s3", vec!["required_call"]), ("sqs", vec!["required_call"])]),
         );
         let visitor = MethodVisitor {
-            client: None,
+            clients: HashSet::new(),
             method_calls: vec![],
             required_props,
         };
@@ -599,10 +608,10 @@ mod test {
             HashMap::from([("s3", vec!["required_call"]), ("sqs", vec!["different_call"])]),
         );
         let visitor = MethodVisitor {
-            client: Some(Client {
+            clients: HashSet::from([Client {
                 name: None,
                 sdk: Some("sqs".to_string()),
-            }),
+            }]),
             method_calls: vec![],
             required_props,
         };
@@ -624,10 +633,10 @@ mod test {
             HashMap::from([("s3", vec!["required_call"]), ("sqs", vec!["different_call"])]),
         );
         let visitor = MethodVisitor {
-            client: Some(Client {
+            clients: HashSet::from([Client {
                 name: Some("sqs_client".to_string()),
                 sdk: None,
-            }),
+            }]),
             method_calls: vec![],
             required_props,
         };
@@ -649,10 +658,10 @@ mod test {
             HashMap::from([("s3", vec!["required_call"]), ("sqs", vec!["different_call"])]),
         );
         let visitor = MethodVisitor {
-            client: Some(Client {
+            clients: HashSet::from([Client {
                 name: Some("sqs".to_string()),
                 sdk: None,
-            }),
+            }]),
             method_calls: vec![],
             required_props,
         };
@@ -669,7 +678,7 @@ mod test {
     #[test]
     fn find_improper_usages_no_method_calls_or_checks_return_zero_usages() {
         let visitor = MethodVisitor {
-            client: None,
+            clients: HashSet::new(),
             method_calls: vec![],
             required_props: Default::default(),
         };
@@ -682,7 +691,7 @@ mod test {
     #[test]
     fn find_improper_usages_method_calls_but_no_checks_return_zero_usages() {
         let visitor = MethodVisitor {
-            client: None,
+            clients: HashSet::new(),
             method_calls: vec![MethodCallWithReceiver {
                 method_call: Ident::new("some_call", Span::call_site()),
                 receiver: None,
@@ -700,7 +709,7 @@ mod test {
         let mut required_props = HashMap::new();
         required_props.insert("some_other_call", HashMap::from([("s3", vec!["required_call"])]));
         let visitor = MethodVisitor {
-            client: None,
+            clients: HashSet::new(),
             method_calls: vec![MethodCallWithReceiver {
                 method_call: Ident::new("some_call", Span::call_site()),
                 receiver: None,
@@ -721,7 +730,7 @@ mod test {
             HashMap::from([("s3", vec!["required_call", "required_call_that_is_missing"])]),
         );
         let visitor = MethodVisitor {
-            client: None,
+            clients: HashSet::new(),
             method_calls: vec![
                 MethodCallWithReceiver {
                     method_call: Ident::new("unknown", Span::call_site()),
@@ -760,7 +769,7 @@ mod test {
             HashMap::from([("s3", vec!["required_call", "required_call_that_is_missing"])]),
         );
         let visitor = MethodVisitor {
-            client: None,
+            clients: HashSet::new(),
             method_calls: vec![
                 MethodCallWithReceiver {
                     method_call: Ident::new("unknown", Span::call_site()),
@@ -803,7 +812,7 @@ mod test {
             HashMap::from([("s3", vec!["required_call", "second_required_call"])]),
         );
         let visitor = MethodVisitor {
-            client: None,
+            clients: HashSet::new(),
             method_calls: vec![
                 MethodCallWithReceiver {
                     method_call: Ident::new("unknown", Span::call_site()),
@@ -847,7 +856,7 @@ mod test {
         );
         required_props.insert("receive_message", HashMap::from([("s3", vec!["required_receive_call"])]));
         let visitor = MethodVisitor {
-            client: None,
+            clients: HashSet::new(),
             method_calls: vec![
                 MethodCallWithReceiver {
                     method_call: Ident::new("send", Span::call_site()),
@@ -906,7 +915,7 @@ mod test {
         );
         required_props.insert("receive_message", HashMap::from([("s3", vec!["required_receive_call"])]));
         let visitor = MethodVisitor {
-            client: None,
+            clients: HashSet::new(),
             method_calls: vec![
                 MethodCallWithReceiver {
                     method_call: Ident::new("send", Span::call_site()),
@@ -965,7 +974,7 @@ mod test {
         );
         required_props.insert("receive_message", HashMap::from([("s3", vec!["required_receive_call"])]));
         let visitor = MethodVisitor {
-            client: None,
+            clients: HashSet::new(),
             method_calls: vec![
                 MethodCallWithReceiver {
                     method_call: Ident::new("send", Span::call_site()),

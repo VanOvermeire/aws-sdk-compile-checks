@@ -2,6 +2,7 @@
 #![allow(unused)]
 
 use aws_config::BehaviorVersion;
+use aws_sdk_dynamodb::types::Replica;
 use aws_sdk_compile_checks_macro::required_props;
 use aws_sdk_sqs::Client;
 
@@ -146,6 +147,24 @@ async fn call_with_sqs_client_not_sns_or_ses(client: Client) {
         .send()
         .await;
 }
+
+// multiple clients
+// (not fully supported, but can work)
+
+#[required_props]
+async fn dynamo_and_sqs(sqs_client: aws_sdk_sqs::Client, dynamodb_client: aws_sdk_dynamodb::Client) {
+    let _ = sqs_client.receive_message()
+        .queue_url("")
+        .send()
+        .await;
+    let _ = dynamodb_client
+        .create_global_table()
+        .global_table_name("...")
+        .replication_group(Replica::builder().region_name("eu-west-1").build())
+        .send()
+        .await;
+}
+
 
 // ideally, this would not cause a compile error (though on the other hand, why add the attribute to a call that is not an SDK call?)
 

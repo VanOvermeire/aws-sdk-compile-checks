@@ -129,6 +129,4 @@ On request, crates from the above list can be added with fairly little effort.
 ## TODO
 
 - Inline documentation
-- Handle multiple clients instead of a single optional one
-- Less owning of strings etc.
-- Add retrieve project to this one
+- Less owning of stuff
