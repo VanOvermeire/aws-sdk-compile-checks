@@ -1,0 +1,5 @@
+error: method `tag_resource` is used in multiple SDKs: accessanalyzer, alexaforbusiness, amp, amplify, amplifyuibuilder... (abbreviated list). Please add the right one(s) to the attribute, e.g. `#[required_props(sdk = accessanalyzer)]`
+ --> tests/fails/unsure_what_sdk_to_use_long_list.rs:6:12
+  |
+6 |     client.tag_resource()
+  |            ^^^^^^^^^^^^

@@ -1,0 +1,12 @@
+[package]
+name = "aws-sdk-compile-checks-macro"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+proc-macro2 = "1.0.79"
+quote = "1.0.35"
+syn = {  version = "2.0.57", features = ["full", "extra-traits", "visit"] }
+
+[lib]
+proc-macro = true

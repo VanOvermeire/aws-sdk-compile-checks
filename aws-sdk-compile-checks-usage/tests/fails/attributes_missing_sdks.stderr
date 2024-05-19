@@ -1,0 +1,5 @@
+error: expected one or more SDKs, separated by `,` after keyword `sdk`, e.g. `sdk = sqs,s3`
+ --> tests/fails/attributes_missing_sdks.rs:3:18
+  |
+3 | #[required_props(sdk =)]
+  |                  ^^^

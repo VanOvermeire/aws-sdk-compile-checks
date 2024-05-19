@@ -1,0 +1,5 @@
+error: expected `sdk` to be followed by a `=` and one or more SDKs, e.g. `sdk = sqs`
+ --> tests/fails/attributes_missing_equals_sign.rs:3:18
+  |
+3 | #[required_props(sdk something)]
+  |                  ^^^

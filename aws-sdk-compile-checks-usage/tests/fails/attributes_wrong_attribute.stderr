@@ -1,0 +1,5 @@
+error: the only allowed attribute is `sdk`
+ --> tests/fails/attributes_wrong_attribute.rs:3:18
+  |
+3 | #[required_props(fake)]
+  |                  ^^^^

@@ -1,0 +1,8 @@
+[workspace]
+resolver = "2"
+
+members = [
+    "aws-sdk-compile-checks-macro",
+    "aws-sdk-compile-checks-usage",
+    "aws-sdk-retrieve-required"
+]
