@@ -150,38 +150,54 @@ impl MethodVisitor {
                 .expect("just checked that there is a key")
                 .to_owned())
         } else {
-            // maybe the values are all the same? if so, we can pick any
-            let (all_the_same, required_props) = hashmaps_with_required_props.values().fold((true, vec![]), |acc, curr| {
-                if acc.1.is_empty() || !acc.0 {
-                    (acc.0, curr.to_owned())
-                } else if acc.1 == *curr {
-                    (true, curr.to_owned())
-                } else {
-                    (false, curr.to_owned())
-                }
-            });
+            let (all_results_are_the_same, required_props) = check_results_for_differences(hashmaps_with_required_props);
 
-            if all_the_same {
+            if all_results_are_the_same {
                 Ok(required_props)
             } else {
                 if !selected_sdks.is_empty() {
-                    // see if any of the specified SDKs actually has the method
-                    // TODO if there are multiple results, that's a problem we might have to report
-                    if let Some(found) = selected_sdks.iter().filter_map(|sdk| hashmaps_with_required_props.get(&sdk.as_ref())).collect::<Vec<_>>().pop() {
-                        return Ok(found.to_owned());
+
+                    let mut results: Vec<(&String, &Vec<&str>)> = selected_sdks.iter()
+                        .filter_map(|sdk| hashmaps_with_required_props.get(&sdk.as_ref()).map(|result| (sdk, result)))
+                        .collect::<Vec<_>>();
+
+                    if results.len() > 1 {
+                        if let Some(receiver) = &function_call.receiver {
+                            let sdk = try_to_get_sdk_from_name(&receiver.to_string());
+                            if let Some(found) = results.iter().filter(|r| r.0 == &sdk).collect::<Vec<_>>().pop() {
+                                return Ok(found.1.to_owned());
+                            }
+                        }
+                        // at this point we could also try to check the clients
+                        // but at this stage, those probably won't be of much use because if the user selected SDKs X and Y, he probably has clients for X and Y as well
+                        // receiver is different because there's only one
+                    }
+
+                    if let Some(found) = results.pop() {
+                        return Ok(found.1.to_owned());
                     }
                 }
 
-                let mut client_results: Vec<Vec<&str>> = self.clients
+                let mut client_results: Vec<(&Client, Vec<&str>)> = self.clients
                     .iter()
-                    .filter_map(|c| self.find_required_props_for_client(hashmaps_with_required_props, c))
+                    .filter_map(|c| self.find_required_props_for_client(hashmaps_with_required_props, c).map(|result| (c, result)))
                     .collect();
 
                 if !client_results.is_empty() {
-                    // ideally, would somehow determine which is the best
-                    Ok(client_results.pop().unwrap())
+                    if client_results.len() > 1 && function_call.receiver.is_some() {
+                        // this could hopefully be nicer
+                        let client_that_matches_receiver_or_default = client_results.iter()
+                            .find(|c| {
+                                c.0.name.is_some() && c.0.name.as_ref().unwrap().eq(&function_call.receiver.as_ref().unwrap().to_string())
+                            }).map(|c| c.clone())
+                            .unwrap_or_else(|| client_results.pop().unwrap()).1;
+                        Ok(client_that_matches_receiver_or_default)
+                    } else {
+                        Ok(client_results.pop().unwrap().1)
+                    }
                 } else {
-                    // still no luck, try a fallback if possible
+                    // still no luck, try a fallback. if that does not work, it's an error
+                    // TODO maybe it makes more sense to try the receiver before looping through the clients!
                     let fallback_client = Client {
                         name: function_call.receiver.as_ref().map(|s| s.to_string()),
                         sdk: None,
@@ -203,11 +219,11 @@ impl MethodVisitor {
                     .to_owned())
             }
             Client { name: Some(name), .. } => {
-                let client_name_prefix = name.replace("client", "").replace('_', "");
+                let sdk = try_to_get_sdk_from_name(name);
 
-                if hashmaps_with_required_props.contains_key(&client_name_prefix.as_ref()) {
+                if hashmaps_with_required_props.contains_key(&sdk.as_ref()) {
                     Some(hashmaps_with_required_props
-                        .get(&client_name_prefix.as_ref())
+                        .get(&sdk.as_ref())
                         .expect("just checked that this key is present")
                         .to_owned())
                 } else {
@@ -217,6 +233,22 @@ impl MethodVisitor {
             _ => None
         }
     }
+}
+
+fn check_results_for_differences<'a>(hashmaps_with_required_props: &HashMap<&str, Vec<&'a str>>) -> (bool, Vec<&'a str>) {
+    hashmaps_with_required_props.values().fold((true, vec![]), |acc, curr| {
+        if acc.1.is_empty() || !acc.0 {
+            (acc.0, curr.to_owned())
+        } else if acc.1 == *curr {
+            (true, curr.to_owned())
+        } else {
+            (false, curr.to_owned())
+        }
+    })
+}
+
+fn try_to_get_sdk_from_name(name: &String) -> String {
+    name.replace("client", "").replace('_', "")
 }
 
 impl<'ast> Visit<'ast> for MethodVisitor {

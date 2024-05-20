@@ -145,7 +145,9 @@ dependencies = [
  "aws-sdk-amplify",
  "aws-sdk-compile-checks-macro",
  "aws-sdk-dynamodb",
+ "aws-sdk-evidently",
  "aws-sdk-lambda",
+ "aws-sdk-sagemaker",
  "aws-sdk-sqs",
  "trybuild",
 ]
@@ -176,6 +178,28 @@ dependencies = [
  "aws-types",
  "bytes",
  "fastrand",
+ "http 0.2.12",
+ "once_cell",
+ "regex-lite",
+ "tracing",
+]
+
+[[package]]
+name = "aws-sdk-evidently"
+version = "1.25.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "01a6c4d5b3aeb643a4e1952ef6d2055d73af8093b3879d124711042e2431a96a"
+dependencies = [
+ "aws-credential-types",
+ "aws-runtime",
+ "aws-smithy-async",
+ "aws-smithy-http",
+ "aws-smithy-json",
+ "aws-smithy-runtime",
+ "aws-smithy-runtime-api",
+ "aws-smithy-types",
+ "aws-types",
+ "bytes",
  "http 0.2.12",
  "once_cell",
  "regex-lite",
@@ -215,6 +239,29 @@ dependencies = [
  "reqwest",
  "scraper",
  "serde",
+]
+
+[[package]]
+name = "aws-sdk-sagemaker"
+version = "1.43.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9b00555d34b7aeb292cccd110f29e0e2f4f847b308853677f25bc895fc3f0f4e"
+dependencies = [
+ "aws-credential-types",
+ "aws-runtime",
+ "aws-smithy-async",
+ "aws-smithy-http",
+ "aws-smithy-json",
+ "aws-smithy-runtime",
+ "aws-smithy-runtime-api",
+ "aws-smithy-types",
+ "aws-types",
+ "bytes",
+ "fastrand",
+ "http 0.2.12",
+ "once_cell",
+ "regex-lite",
+ "tracing",
 ]
 
 [[package]]

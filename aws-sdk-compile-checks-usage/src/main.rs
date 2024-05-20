@@ -3,6 +3,7 @@
 
 use aws_config::BehaviorVersion;
 use aws_sdk_dynamodb::types::Replica;
+use aws_sdk_sagemaker::types::ServiceCatalogProvisioningDetails;
 use aws_sdk_compile_checks_macro::required_props;
 use aws_sdk_sqs::Client;
 
@@ -149,7 +150,7 @@ async fn call_with_sqs_client_not_sns_or_ses(client: Client) {
 }
 
 // multiple clients
-// (not fully supported, but can work)
+// (not fully supported)
 
 #[required_props]
 async fn dynamo_and_sqs(sqs_client: aws_sdk_sqs::Client, dynamodb_client: aws_sdk_dynamodb::Client) {
@@ -165,6 +166,31 @@ async fn dynamo_and_sqs(sqs_client: aws_sdk_sqs::Client, dynamodb_client: aws_sd
         .await;
 }
 
+#[required_props]
+async fn evidently_and_sagemaker(evidently_client: aws_sdk_evidently::Client, sagemaker_client: aws_sdk_sagemaker::Client) {
+    let _ = evidently_client.create_project()
+        .name("name")
+        .send()
+        .await;
+    let _ = sagemaker_client.create_project()
+        .project_name("name")
+        .service_catalog_provisioning_details(ServiceCatalogProvisioningDetails::builder().build())
+        .send()
+        .await;
+}
+
+#[required_props(sdk = evidently,sagemaker)]
+async fn evidently_and_sagemaker_with_selected_sdks(evidently_client: aws_sdk_evidently::Client, sagemaker_client: aws_sdk_sagemaker::Client) {
+    let _ = evidently_client.create_project()
+        .name("name")
+        .send()
+        .await;
+    let _ = sagemaker_client.create_project()
+        .project_name("name")
+        .service_catalog_provisioning_details(ServiceCatalogProvisioningDetails::builder().build())
+        .send()
+        .await;
+}
 
 // ideally, this would not cause a compile error (though on the other hand, why add the attribute to a call that is not an SDK call?)
 

@@ -130,3 +130,6 @@ On request, crates from the above list can be added with fairly little effort.
 
 - Inline documentation
 - Less owning of stuff
+- More tests
+- Refactoring of internals
+- When multiple clients are present and have the same method name, thrown an error?

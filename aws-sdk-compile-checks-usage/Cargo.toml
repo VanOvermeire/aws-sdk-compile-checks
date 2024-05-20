@@ -8,6 +8,8 @@ aws-sdk-compile-checks-macro = { path = "../aws-sdk-compile-checks-macro" }
 aws-config = "1.1.8"
 aws-sdk-sqs = "1.9.0"
 aws-sdk-dynamodb = "1.28.0"
+aws-sdk-sagemaker = "1.43.0"
+aws-sdk-evidently = "1.25.0"
 
 [dev-dependencies]
 trybuild = "1.0.91"
