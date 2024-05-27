@@ -1,12 +1,13 @@
 # AWS SDK Compile Checks
 
 Checks for the presence of required attributes when using calling AWS SDK client methods for some 300 AWS crates and 9000 methods.
+
 By default, the AWS SDK will panic at runtime when required properties are missing.
-With this macro, we shift to the left, failing at compile-time.
+With this macro, we shift to the left, failing at compile time.
 
 ## Install
 
-Add the macro with the following command
+Add the macro to your dependencies with the following command:
 
 ```
 cargo add aws-sdk-compile-checks
@@ -14,7 +15,8 @@ cargo add aws-sdk-compile-checks
 
 ## Usage
 
-Add the `#[required_props]` attribute to functions that are using an AWS client.
+After adding the crate to your dependencies, you can use the `#[required_props]` attribute to annotate functions that use an AWS client.
+
 For example:
 
 ```rust
@@ -23,7 +25,7 @@ async fn example() -> Result<()> {
     let aws_config = aws_config::load_defaults(BehaviorVersion::latest()).await;
     let sqs_client = aws_sdk_sqs::Client::new(&aws_config);
     sqs_client.send_message()
-        // where is the queue_url?
+        // missing queue url
         .message_body(create_message())
         .send()
         .await
@@ -34,7 +36,7 @@ async fn example() -> Result<()> {
 
 In the above example, you will get a compile time error complaining that `queue_url()`, which required, is missing.
 
-You can also add the attribute to `impl` blocks. Here's a valid (non-throwing) example:
+You can also add the attribute to `impl` blocks. The following example will compile since it has all the required properties:
 
 ```rust
 struct AwsClientPrefix {
@@ -62,17 +64,17 @@ async fn do_call() -> Result<()> {
 }
 ```
 
-More importantly, specifying your SDK(s) is required when there is an overlap in method names. 
-I.e. when more than one SDK has the method name, and the required properties differ from each other.
+Specifying your SDK(s) is required when there is an overlap in method names.
+I.e. when more than one SDK has a given method name, and the required properties differ.
 For example, both `connectparticipant` and `sqs` have a `send_message` method.
-In that case, the SDK might not be able to identify the right SDK, and will ask you to be more specific by adding an `sdk` parameter.
+In that case, the macro might not be able to identify the right SDK. If that's the case, it will ask you to be more specific.
 
 ## Limitations
 
-When used without additional arguments, this macro tries to make an _educated guess_ as to what specific SDK client is used, by looking at things like the signature, type, and naming.
-Plus, the method name is often unique, which means we know perfectly well what the required properties are.
+When used without additional arguments, the macro tries to make an _educated guess_ as to what specific SDK client is used, by looking at things like the signature, type, and naming.
+Plus, as the method name is often unique, we often have only one list of required properties.
 
-But it's heuristics, meaning things can still go wrong:
+But it's all heuristics, so things can go wrong:
 - we might think something is an SDK call, when it is not
 - we might think something is not an SDK call, when it is
 - we might misidentify the method
@@ -80,15 +82,32 @@ But it's heuristics, meaning things can still go wrong:
 
 The false positives and negatives are unavoidable in sufficiently complex use cases.
 They can be mitigated by improving the heuristics, but in some cases you will have to take action yourself:
-- split off code that was misidentified as an SDK call, or remove the macro
+- split off code that was misidentified as an SDK call
 - pick names that help the macro identify the correct client (e.g. `sqs_client` instead of `client`)
-- specify the SDKs that need to be checked with `sdk =` (see the examples section above)
+- specify the SDKs that need to be checked with `sdk =` (see the 'Usage' section above)
 
-In theory, the required properties could change over time, which would mean the macro should somehow take into account what version of the AWS SDK you are running.
-But in practice this should be extremely rare for backwards-compatibility reasons.
-False negatives can occur when new methods are added to the SDKs that are not yet in the list maintained by this macro.
+In theory, the required properties could evolve over time, which would mean the macro should take into account what version of the AWS SDK you are running.
+But since this is a breaking change for existing properties, this should be very rare.
+False negatives can occur when new methods are added to the SDKs that are not yet in the list maintained by this macro though.
 
-Finally, _several crates are currently not included_:
+## PRs etc.
+
+Pull requests, comments, suggestions... are welcome.
+
+## TODO
+
+- Inline documentation
+- Less owning of stuff
+- Refactoring of internals
+- Get rid of unwraps
+
+## Crates that are not yet included
+
+Some 30 crates are currently not included, you can find a list below.
+
+In some cases, I thought these crates were less important, or had less use for compile time checks.
+And more crates and methods mean more space and time requirements.
+On request, crates from this list can be added.
 
 - aws_sdk_finspace
 - bcmdataexports
@@ -96,12 +115,12 @@ Finally, _several crates are currently not included_:
 - chimesdkidentity
 - chimesdkmediapipelines
 - chimesdkmeetings
-- chimesdkmessaging 
+- chimesdkmessaging
 - chimesdkvoice
 - cloudsearchdomain
 - databasemigration
 - ivschat
-- licensemanager 
+- licensemanager
 - licensemanagerlinuxsubscriptions
 - licensemanagerusersubscriptions
 - migrationhub
@@ -121,15 +140,3 @@ Finally, _several crates are currently not included_:
 - workspaces
 - workspacesthinclient
 - workspacesweb
-
-In some cases, I thought they were less important in general, or perhaps less in need of these compile time checks.
-And more crates and methods mean more space and time requirements.
-On request, crates from the above list can be added with fairly little effort.
-
-## TODO
-
-- Inline documentation
-- Less owning of stuff
-- More tests
-- Refactoring of internals
-- When multiple clients are present and have the same method name, thrown an error?
