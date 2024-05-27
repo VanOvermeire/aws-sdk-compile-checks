@@ -34,6 +34,7 @@ pub(crate) struct ImproperUsage {
     pub(crate) span: Span,
     pub(crate) method: String,
     pub(crate) missing: Vec<String>,
+    pub(crate) sdk: String,
 }
 
 #[derive(Debug, PartialEq)]
@@ -59,6 +60,7 @@ impl MethodVisitor {
         visitor
     }
 
+    // TODO some additional tests
     pub(crate) fn find_improper_usages(&self, mut selected_sdks: Vec<String>) -> Vec<UsageFinds> {
         let mut initial: Vec<_> = self.method_calls.iter().rev().collect();
         let mut results: Vec<UsageFinds> = vec![];
@@ -120,6 +122,7 @@ impl MethodVisitor {
 
             // now we can compare our required arguments with the real arguments. if one of the required 'check' values is not present, we have a problem
             let missing_required_args: Vec<_> = required_props_for_this_method
+                .1
                 .into_iter()
                 .map(|c| c.to_string())
                 .filter(|c| !arguments_for_function.contains(c))
@@ -130,6 +133,7 @@ impl MethodVisitor {
                     span: sdk_function_call.method_call.span(),
                     method: sdk_function_call.method_call.to_string(),
                     missing: missing_required_args,
+                    sdk: required_props_for_this_method.0,
                 }));
             }
 
@@ -154,23 +158,31 @@ impl MethodVisitor {
         &self,
         function_call: &MethodCallWithReceiver,
         selected_sdks: &mut Vec<String>,
-    ) -> Result<Vec<&'a str>, Vec<String>> {
+    ) -> Result<(String, Vec<&'a str>), Vec<String>> {
         let hashmaps_with_required_props = self
             .required_props
             .get::<str>(function_call.method_call.to_string().as_ref())
             .expect("should have been verified that the method is present");
 
         if hashmaps_with_required_props.keys().len() == 1 {
-            return Ok(hashmaps_with_required_props
-                .values()
-                .next()
-                .expect("just checked that there is a key")
-                .to_owned());
+            return Ok((
+                hashmaps_with_required_props.keys().next().unwrap().to_string(),
+                hashmaps_with_required_props
+                    .values()
+                    .next()
+                    .expect("just checked that there is a key")
+                    .to_owned()
+            ));
         }
         let (all_results_are_the_same, required_props) = results_that_are_all_the_same(hashmaps_with_required_props);
 
         if all_results_are_the_same {
-            return Ok(required_props);
+            let mut sdks = hashmaps_with_required_props.keys().into_iter().map(|v| v.to_string()).collect::<Vec<_>>();
+            sdks.sort_unstable();
+            return Ok((
+                sdks.join(","),
+                required_props,
+            ));
         }
 
         if !selected_sdks.is_empty() {
@@ -184,14 +196,17 @@ impl MethodVisitor {
                 if let Some(receiver) = &function_call.receiver {
                     let sdk = try_to_get_sdk_from_name(&receiver.to_string());
                     if let Some(found) = results.iter().filter(|r| r.0 == &sdk).collect::<Vec<_>>().pop() {
-                        return Ok(found.1.to_owned());
+                        return Ok((sdk, found.1.to_owned()));
                     }
                 }
                 // at this point we could try to check the client, but those probably won't be of use because if the user selected SDKs X and Y, he probably has clients for both
             }
 
             if let Some(found) = results.pop() {
-                return Ok(found.1.to_owned());
+                return Ok((
+                    selected_sdks.first().expect("called after is_empty check").to_string(),
+                    found.1.to_owned()
+                ));
             }
         }
 
@@ -202,9 +217,10 @@ impl MethodVisitor {
                 sdk: None,
             };
             if let Some(found) = self.required_props_for_client(hashmaps_with_required_props, &receiver_as_client) {
-                return Ok(
+                return Ok((
+                    try_to_get_sdk_from_name(&receiver_as_client.name.expect("just set the name of the client")),
                     found.to_owned()
-                );
+                ));
             }
         }
 
@@ -226,11 +242,20 @@ impl MethodVisitor {
                         c.0.name.is_some() && c.0.name.as_ref().unwrap().eq(&function_call.receiver.as_ref().unwrap().to_string())
                     })
                     .map(|c| c.clone())
-                    .unwrap_or_else(|| client_results.pop().unwrap())
-                    .1;
-                Ok(client_that_matches_receiver_or_default)
+                    .unwrap_or_else(|| client_results.pop().unwrap());
+                let client = client_that_matches_receiver_or_default.0;
+                let sdk = try_to_get_sdk_from_client(client);
+
+                Ok((sdk, client_that_matches_receiver_or_default.1))
             } else {
-                Ok(client_results.pop().unwrap().1)
+                let client_result = client_results.pop().expect("called after is_empty check");
+                let client = client_result.0;
+                let sdk = try_to_get_sdk_from_client(client);
+
+                Ok((
+                    sdk,
+                    client_result.1
+                ))
             }
         } else {
             Err(hashmaps_with_required_props.keys().map(|key| key.to_string()).collect())
@@ -278,6 +303,16 @@ fn results_that_are_all_the_same<'a>(hashmaps_with_required_props: &HashMap<&str
             (false, curr.to_owned())
         }
     })
+}
+
+fn try_to_get_sdk_from_client(client: &Client) -> String {
+    if let Some(sdk) = client.sdk.as_ref() {
+        sdk.to_string()
+    } else if let Some(name) = client.name.as_ref() {
+        try_to_get_sdk_from_name(name)
+    } else {
+        "unknown".to_string()
+    }
 }
 
 fn try_to_get_sdk_from_name(name: &String) -> String {
@@ -641,7 +676,7 @@ mod test {
 
         let actual = visitor.get_required_props_for(&call, &mut vec![]).unwrap();
 
-        assert_eq!(actual, vec!["required_call"]);
+        assert_eq!(actual, ("s3".to_string(), vec!["required_call"]));
     }
 
     #[test]
@@ -663,7 +698,7 @@ mod test {
 
         let actual = visitor.get_required_props_for(&call, &mut vec![]).unwrap();
 
-        assert_eq!(actual, vec!["required_call"]);
+        assert_eq!(actual, ("s3,sqs".to_string(), vec!["required_call"]));
     }
 
     #[test]
@@ -688,7 +723,7 @@ mod test {
 
         let actual = visitor.get_required_props_for(&call, &mut vec![]).unwrap();
 
-        assert_eq!(actual, vec!["different_call"]);
+        assert_eq!(actual, ("sqs".to_string(), vec!["different_call"]));
     }
 
     #[test]
@@ -713,7 +748,7 @@ mod test {
 
         let actual = visitor.get_required_props_for(&call, &mut vec![]).unwrap();
 
-        assert_eq!(actual, vec!["different_call"]);
+        assert_eq!(actual, ("sqs".to_string(), vec!["different_call"]));
     }
 
     #[test]
@@ -738,7 +773,7 @@ mod test {
 
         let actual = visitor.get_required_props_for(&call, &mut vec![]).unwrap();
 
-        assert_eq!(actual, vec!["different_call"]);
+        assert_eq!(actual, ("sqs".to_string(), vec!["different_call"]));
     }
 
     #[test]

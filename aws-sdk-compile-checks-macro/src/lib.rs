@@ -39,9 +39,10 @@ pub fn required_props(attrs: TokenStream, input: TokenStream) -> TokenStream {
         .into_iter()
         .map(|find| {
             match find {
+                // TODO move this and the usage finds to a separate file
                 UsageFinds::Improper(improper) => {
                     let missing = improper.missing.into_iter().map(|s| format!("`{}`", s)).collect::<Vec<_>>().join(COMMA_WITH_SPACE);
-                    let message = format!("method `{}` is missing required argument(s): {}", improper.method, missing);
+                    let message = format!("method `{}` (from {}) is missing required argument(s): {}", improper.method, improper.sdk, missing);
                     syn::Error::new(improper.span, message)
                         .to_compile_error()
                 }

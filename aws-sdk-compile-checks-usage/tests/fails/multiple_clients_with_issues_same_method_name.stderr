@@ -1,10 +1,10 @@
-error: method `create_project` is missing required argument(s): `project_name`, `service_catalog_provisioning_details`
+error: method `create_project` (from sagemaker) is missing required argument(s): `project_name`, `service_catalog_provisioning_details`
  --> tests/fails/multiple_clients_with_issues_same_method_name.rs:8:30
   |
 8 |     let _ = sagemaker_client.create_project()
   |                              ^^^^^^^^^^^^^^
 
-error: method `create_project` is missing required argument(s): `name`
+error: method `create_project` (from evidently) is missing required argument(s): `name`
  --> tests/fails/multiple_clients_with_issues_same_method_name.rs:5:30
   |
 5 |     let _ = evidently_client.create_project()

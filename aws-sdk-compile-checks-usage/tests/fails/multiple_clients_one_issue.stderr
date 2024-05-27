@@ -1,4 +1,4 @@
-error: method `create_global_table` is missing required argument(s): `replication_group`
+error: method `create_global_table` (from dynamodb) is missing required argument(s): `replication_group`
   --> tests/fails/multiple_clients_one_issue.rs:10:10
    |
 10 |         .create_global_table()

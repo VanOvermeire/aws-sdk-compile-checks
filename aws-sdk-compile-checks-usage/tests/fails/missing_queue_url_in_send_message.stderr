@@ -1,4 +1,4 @@
-error: method `send_message` is missing required argument(s): `queue_url`
+error: method `send_message` (from sqs) is missing required argument(s): `queue_url`
   --> tests/fails/missing_queue_url_in_send_message.rs:10:16
    |
 10 |     sqs_client.send_message()

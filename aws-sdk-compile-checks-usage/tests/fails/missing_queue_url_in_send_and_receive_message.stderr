@@ -1,10 +1,10 @@
-error: method `receive_message` is missing required argument(s): `queue_url`
+error: method `receive_message` (from sqs) is missing required argument(s): `queue_url`
   --> tests/fails/missing_queue_url_in_send_and_receive_message.rs:13:16
    |
 13 |     sqs_client.receive_message()
    |                ^^^^^^^^^^^^^^^
 
-error: method `send_message` is missing required argument(s): `queue_url`
+error: method `send_message` (from sqs) is missing required argument(s): `queue_url`
  --> tests/fails/missing_queue_url_in_send_and_receive_message.rs:8:16
   |
 8 |     sqs_client.send_message()
