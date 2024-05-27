@@ -1,12 +1,12 @@
 use std::collections::{HashMap, HashSet};
 
 use proc_macro2::{Ident, Span};
+use syn::{Expr, ExprMethodCall, FnArg, ItemFn, Local, Member, Pat, Signature, Type, visit};
 use syn::visit::Visit;
-use syn::{visit, Expr, ExprMethodCall, FnArg, ItemFn, Local, Member, Pat, Signature, Type};
 
 use crate::required_properties::RequiredPropertiesMap;
 
-const AWS_SDK_SEND: &str = "send"; // terminates the call to AWS in the SDK
+const AWS_SDK_SEND: &str = "send"; // terminates calls to AWS in the SDK
 const AWS_SDK_PREFIX: &str = "aws_sdk_"; // e.g. aws_sdk_sqs::Client
 
 #[derive(Debug)]
@@ -18,9 +18,7 @@ pub(crate) struct MethodVisitor {
 
 #[derive(Debug)]
 pub(crate) enum UsageFinds {
-    // wrong usage
     Improper(ImproperUsage),
-    // we don't know what SDK(s) we are dealing with
     Unknown(UnknownUsage),
 }
 
@@ -94,11 +92,11 @@ impl MethodVisitor {
             if let Some(receiver) = &sdk_function_call.receiver {
                 if !self.clients.is_empty()
                     && !self
-                        .clients
-                        .iter()
-                        .filter_map(|c| c.name.to_owned())
-                        .collect::<Vec<String>>()
-                        .contains(&&receiver.to_string())
+                    .clients
+                    .iter()
+                    .filter_map(|c| c.name.to_owned())
+                    .collect::<Vec<String>>()
+                    .contains(&&receiver.to_string())
                 {
                     // we have clients and none of them match the receiver, meaning this probably isn't a relevant function
                     skip_until_relevant_function_call.drain(0..arguments_for_function.len());
@@ -154,80 +152,78 @@ impl MethodVisitor {
             .expect("should have been verified that the method is present");
 
         if hashmaps_with_required_props.keys().len() == 1 {
-            Ok(hashmaps_with_required_props
+            return Ok(hashmaps_with_required_props
                 .values()
                 .next()
                 .expect("just checked that there is a key")
-                .to_owned())
-        } else {
-            let (all_results_are_the_same, required_props) = check_results_for_differences(hashmaps_with_required_props);
+                .to_owned());
+        }
+        let (all_results_are_the_same, required_props) = results_that_are_all_the_same(hashmaps_with_required_props);
 
-            if all_results_are_the_same {
-                Ok(required_props)
-            } else {
-                if !selected_sdks.is_empty() {
-                    let mut results: Vec<(&String, &Vec<&str>)> = selected_sdks
-                        .iter()
-                        .filter_map(|sdk| hashmaps_with_required_props.get(&sdk.as_ref()).map(|result| (sdk, result)))
-                        .collect::<Vec<_>>();
+        if all_results_are_the_same {
+            return Ok(required_props);
+        }
 
-                    if results.len() > 1 {
-                        if let Some(receiver) = &function_call.receiver {
-                            let sdk = try_to_get_sdk_from_name(&receiver.to_string());
-                            if let Some(found) = results.iter().filter(|r| r.0 == &sdk).collect::<Vec<_>>().pop() {
-                                return Ok(found.1.to_owned());
-                            }
-                        }
-                        // at this point we could also try to check the clients
-                        // but at this stage, those probably won't be of much use because if the user selected SDKs X and Y, he probably has clients for X and Y as well
-                        // receiver is different because there's only one
-                    }
+        if !selected_sdks.is_empty() {
+            let mut results: Vec<(&String, &Vec<&str>)> = selected_sdks
+                .iter()
+                .filter_map(|sdk| hashmaps_with_required_props.get(&sdk.as_ref()).map(|result| (sdk, result)))
+                .collect::<Vec<_>>();
 
-                    if let Some(found) = results.pop() {
+            if results.len() > 1 {
+                // receiver can be a tie-breaker
+                if let Some(receiver) = &function_call.receiver {
+                    let sdk = try_to_get_sdk_from_name(&receiver.to_string());
+                    if let Some(found) = results.iter().filter(|r| r.0 == &sdk).collect::<Vec<_>>().pop() {
                         return Ok(found.1.to_owned());
                     }
                 }
-
-                let mut client_results: Vec<(&Client, Vec<&str>)> = self
-                    .clients
-                    .iter()
-                    .filter_map(|c| {
-                        self.find_required_props_for_client(hashmaps_with_required_props, c)
-                            .map(|result| (c, result))
-                    })
-                    .collect();
-
-                if !client_results.is_empty() {
-                    if client_results.len() > 1 && function_call.receiver.is_some() {
-                        // this could hopefully be nicer
-                        let client_that_matches_receiver_or_default = client_results
-                            .iter()
-                            .find(|c| {
-                                c.0.name.is_some() && c.0.name.as_ref().unwrap().eq(&function_call.receiver.as_ref().unwrap().to_string())
-                            })
-                            .map(|c| c.clone())
-                            .unwrap_or_else(|| client_results.pop().unwrap())
-                            .1;
-                        Ok(client_that_matches_receiver_or_default)
-                    } else {
-                        Ok(client_results.pop().unwrap().1)
-                    }
-                } else {
-                    // still no luck, try a fallback. if that does not work, it's an error
-                    // TODO maybe it makes more sense to try the receiver before looping through the clients!
-                    let fallback_client = Client {
-                        name: function_call.receiver.as_ref().map(|s| s.to_string()),
-                        sdk: None,
-                    };
-                    self.find_required_props_for_client(hashmaps_with_required_props, &fallback_client)
-                        .map(|v| Ok(v))
-                        .unwrap_or_else(|| Err(hashmaps_with_required_props.keys().map(|key| key.to_string()).collect()))
-                }
+                // at this point we could try to check the client, but those probably won't be of use because if the user selected SDKs X and Y, he probably has clients for both
             }
+
+            if let Some(found) = results.pop() {
+                return Ok(found.1.to_owned());
+            }
+        }
+
+        let mut client_results: Vec<(&Client, Vec<&str>)> = self
+            .clients
+            .iter()
+            .filter_map(|c| {
+                self.required_props_for_client(hashmaps_with_required_props, c)
+                    .map(|result| (c, result))
+            })
+            .collect();
+
+        if !client_results.is_empty() {
+            if client_results.len() > 1 && function_call.receiver.is_some() {
+                // this could hopefully be nicer
+                let client_that_matches_receiver_or_default = client_results
+                    .iter()
+                    .find(|c| {
+                        c.0.name.is_some() && c.0.name.as_ref().unwrap().eq(&function_call.receiver.as_ref().unwrap().to_string())
+                    })
+                    .map(|c| c.clone())
+                    .unwrap_or_else(|| client_results.pop().unwrap())
+                    .1;
+                Ok(client_that_matches_receiver_or_default)
+            } else {
+                Ok(client_results.pop().unwrap().1)
+            }
+        } else {
+            // still no luck, try a fallback. if that does not work, it's an error
+            // TODO maybe it makes more sense to try the receiver before looping through the clients!
+            let fallback_client = Client {
+                name: function_call.receiver.as_ref().map(|s| s.to_string()),
+                sdk: None,
+            };
+            self.required_props_for_client(hashmaps_with_required_props, &fallback_client)
+                .map(|v| Ok(v))
+                .unwrap_or_else(|| Err(hashmaps_with_required_props.keys().map(|key| key.to_string()).collect()))
         }
     }
 
-    fn find_required_props_for_client<'a>(
+    fn required_props_for_client<'a>(
         &self,
         hashmaps_with_required_props: &HashMap<&'a str, Vec<&'a str>>,
         client: &Client,
@@ -258,7 +254,7 @@ impl MethodVisitor {
     }
 }
 
-fn check_results_for_differences<'a>(hashmaps_with_required_props: &HashMap<&str, Vec<&'a str>>) -> (bool, Vec<&'a str>) {
+fn results_that_are_all_the_same<'a>(hashmaps_with_required_props: &HashMap<&str, Vec<&'a str>>) -> (bool, Vec<&'a str>) {
     hashmaps_with_required_props.values().fold((true, vec![]), |acc, curr| {
         if acc.1.is_empty() || !acc.0 {
             (acc.0, curr.to_owned())
@@ -394,9 +390,9 @@ mod test {
 
     use proc_macro2::{Ident, Span};
     use quote::quote;
-    use syn::visit::Visit;
     use syn::Expr::MethodCall;
     use syn::Stmt;
+    use syn::visit::Visit;
 
     use crate::visitor::{analyze_signature, Client, ImproperUsage, MethodCallWithReceiver, MethodVisitor, UsageFinds};
 
@@ -452,7 +448,7 @@ mod test {
             vec![MethodCallWithReceiver {
                 method_call: Ident::new("to_string", Span::call_site()),
                 receiver: Some(Ident::new("some_thing", Span::call_site())),
-            },]
+            }, ]
         );
     }
 
