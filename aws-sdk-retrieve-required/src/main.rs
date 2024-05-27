@@ -73,14 +73,14 @@ fn retrieve_aws_docs(client: &Client, service: &str) -> Result<String> {
         .get(&url)
         .send()
         .with_context(|| format!("call to url {} for {} failed", &url, service))?;
-    Ok(result
+    result
         .text()
-        .with_context(|| format!("call to get text for url {} for {} failed", &url, service))?)
+        .with_context(|| format!("call to get text for url {} for {} failed", &url, service))
 }
 
 fn sanitize_property(prop_name: String) -> String {
     prop_name
-        .split("(")
+        .split('(')
         .next()
         .expect("Split to always have at least one element")
         .to_string()
@@ -91,10 +91,10 @@ fn analyze_text<'a>(
     method_selector: &Selector,
     properties_selector: &Selector,
     property_selector: &Selector,
-    docs: &String,
+    docs: &str,
     service: &'a str,
 ) -> Result<Vec<Record<'a>>> {
-    let document = Html::parse_document(&docs);
+    let document = Html::parse_document(docs);
 
     let mut required_props_per_method = vec![];
 

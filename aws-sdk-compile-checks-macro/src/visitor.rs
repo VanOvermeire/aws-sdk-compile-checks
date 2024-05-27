@@ -78,7 +78,7 @@ impl MethodVisitor {
                     .iter()
                     .filter_map(|c| c.name.to_owned())
                     .collect::<Vec<String>>()
-                    .contains(&&receiver.to_string())
+                    .contains(&receiver.to_string())
                 {
                     // we have clients and none of them match the receiver, meaning this probably isn't a relevant function
                     skip_until_relevant_function_call.drain(0..arguments_for_function.len());
@@ -137,7 +137,7 @@ impl MethodVisitor {
     fn get_required_props_for<'a>(
         &self,
         function_call: &MethodCallWithReceiver,
-        selected_sdks: &mut Vec<String>,
+        selected_sdks: &mut [String],
     ) -> Result<(String, Vec<&'a str>), Vec<String>> {
         let hashmaps_with_required_props = self
             .required_props
@@ -157,7 +157,7 @@ impl MethodVisitor {
         let (all_results_are_the_same, required_props) = results_that_are_all_the_same(hashmaps_with_required_props);
 
         if all_results_are_the_same {
-            let mut sdks = hashmaps_with_required_props.keys().into_iter().map(|v| v.to_string()).collect::<Vec<_>>();
+            let mut sdks = hashmaps_with_required_props.keys().map(|v| v.to_string()).collect::<Vec<_>>();
             sdks.sort_unstable();
             return Ok((
                 sdks.join(","),
@@ -221,7 +221,7 @@ impl MethodVisitor {
                     .find(|c| {
                         c.0.name.is_some() && c.0.name.as_ref().unwrap().eq(&function_call.receiver.as_ref().unwrap().to_string())
                     })
-                    .map(|c| c.clone())
+                    .cloned()
                     .unwrap_or_else(|| client_results.pop().unwrap());
                 let client = client_that_matches_receiver_or_default.0;
                 let sdk = try_to_get_sdk_from_client(client);
@@ -295,7 +295,7 @@ fn try_to_get_sdk_from_client(client: &Client) -> String {
     }
 }
 
-fn try_to_get_sdk_from_name(name: &String) -> String {
+fn try_to_get_sdk_from_name(name: &str) -> String {
     name.replace("client", "").replace('_', "")
 }
 
