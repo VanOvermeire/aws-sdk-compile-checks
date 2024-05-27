@@ -141,6 +141,15 @@ impl MethodVisitor {
         results
     }
 
+    /**
+     * Algorithm:
+     * - if there's only one result (or none at all), return
+     * - if there are multiple results, check if they are all the same. If that's true, return any of them
+     * - if there are multiple results, and they are not the same, check if the user specified SDKs and return a match. If we still have multiple results, check if the receiver is of any help
+     * - if we still the user did not specify an SDK, check the receiver
+     * - if we still haven't found a unique match, try using the clients
+     * - if everything fails, return an error containing the list of keys (SDKs) that we did find
+     */
     fn get_required_props_for<'a>(
         &self,
         function_call: &MethodCallWithReceiver,
@@ -186,6 +195,19 @@ impl MethodVisitor {
             }
         }
 
+        if let Some(receiver) = &function_call.receiver {
+            let receiver_as_string = receiver.to_string();
+            let receiver_as_client = Client {
+                name: Some(receiver_as_string.clone()),
+                sdk: None,
+            };
+            if let Some(found) = self.required_props_for_client(hashmaps_with_required_props, &receiver_as_client) {
+                return Ok(
+                    found.to_owned()
+                );
+            }
+        }
+
         let mut client_results: Vec<(&Client, Vec<&str>)> = self
             .clients
             .iter()
@@ -211,15 +233,7 @@ impl MethodVisitor {
                 Ok(client_results.pop().unwrap().1)
             }
         } else {
-            // still no luck, try a fallback. if that does not work, it's an error
-            // TODO maybe it makes more sense to try the receiver before looping through the clients!
-            let fallback_client = Client {
-                name: function_call.receiver.as_ref().map(|s| s.to_string()),
-                sdk: None,
-            };
-            self.required_props_for_client(hashmaps_with_required_props, &fallback_client)
-                .map(|v| Ok(v))
-                .unwrap_or_else(|| Err(hashmaps_with_required_props.keys().map(|key| key.to_string()).collect()))
+            Err(hashmaps_with_required_props.keys().map(|key| key.to_string()).collect())
         }
     }
 
