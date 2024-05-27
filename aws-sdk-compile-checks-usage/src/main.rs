@@ -2,9 +2,9 @@
 #![allow(unused)]
 
 use aws_config::BehaviorVersion;
+use aws_sdk_compile_checks_macro::required_props;
 use aws_sdk_dynamodb::types::Replica;
 use aws_sdk_sagemaker::types::ServiceCatalogProvisioningDetails;
-use aws_sdk_compile_checks_macro::required_props;
 use aws_sdk_sqs::Client;
 
 // these are normal functions and should not error
@@ -94,7 +94,8 @@ struct AnotherClient {
 impl AnotherClient {
     #[required_props]
     async fn a_call(&self) {
-        let _ = self.sqs_client
+        let _ = self
+            .sqs_client
             .send_message()
             .queue_url("something")
             .message_body("message")
@@ -132,21 +133,13 @@ impl AwsClientNoPrefix {
 
     #[required_props(sdk = sqs)]
     async fn call(&self) {
-        let _ = self.client
-            .receive_message()
-            .queue_url("something")
-            .send()
-            .await;
+        let _ = self.client.receive_message().queue_url("something").send().await;
     }
 }
 
 #[required_props(sdk = sqs,sns,ses)]
 async fn call_with_sqs_client_not_sns_or_ses(client: Client) {
-    let _ = client.send_message()
-        .queue_url("")
-        .message_body("")
-        .send()
-        .await;
+    let _ = client.send_message().queue_url("").message_body("").send().await;
 }
 
 // multiple clients
@@ -154,10 +147,7 @@ async fn call_with_sqs_client_not_sns_or_ses(client: Client) {
 
 #[required_props]
 async fn dynamo_and_sqs(sqs_client: aws_sdk_sqs::Client, dynamodb_client: aws_sdk_dynamodb::Client) {
-    let _ = sqs_client.receive_message()
-        .queue_url("")
-        .send()
-        .await;
+    let _ = sqs_client.receive_message().queue_url("").send().await;
     let _ = dynamodb_client
         .create_global_table()
         .global_table_name("...")
@@ -168,11 +158,9 @@ async fn dynamo_and_sqs(sqs_client: aws_sdk_sqs::Client, dynamodb_client: aws_sd
 
 #[required_props]
 async fn evidently_and_sagemaker(evidently_client: aws_sdk_evidently::Client, sagemaker_client: aws_sdk_sagemaker::Client) {
-    let _ = evidently_client.create_project()
-        .name("name")
-        .send()
-        .await;
-    let _ = sagemaker_client.create_project()
+    let _ = evidently_client.create_project().name("name").send().await;
+    let _ = sagemaker_client
+        .create_project()
         .project_name("name")
         .service_catalog_provisioning_details(ServiceCatalogProvisioningDetails::builder().build())
         .send()
@@ -180,12 +168,13 @@ async fn evidently_and_sagemaker(evidently_client: aws_sdk_evidently::Client, sa
 }
 
 #[required_props(sdk = evidently,sagemaker)]
-async fn evidently_and_sagemaker_with_selected_sdks(evidently_client: aws_sdk_evidently::Client, sagemaker_client: aws_sdk_sagemaker::Client) {
-    let _ = evidently_client.create_project()
-        .name("name")
-        .send()
-        .await;
-    let _ = sagemaker_client.create_project()
+async fn evidently_and_sagemaker_with_selected_sdks(
+    evidently_client: aws_sdk_evidently::Client,
+    sagemaker_client: aws_sdk_sagemaker::Client,
+) {
+    let _ = evidently_client.create_project().name("name").send().await;
+    let _ = sagemaker_client
+        .create_project()
         .project_name("name")
         .service_catalog_provisioning_details(ServiceCatalogProvisioningDetails::builder().build())
         .send()

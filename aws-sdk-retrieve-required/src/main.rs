@@ -1,12 +1,12 @@
-use std::fs::File;
-use std::io::{BufRead, BufReader, Error};
 use anyhow::{Context, Result};
 use rayon::iter::IntoParallelRefIterator;
 use rayon::iter::ParallelIterator;
 use reqwest::blocking::Client;
-use scraper::{Html, Selector};
 use scraper::selectable::Selectable;
+use scraper::{Html, Selector};
 use serde::Serialize;
+use std::fs::File;
+use std::io::{BufRead, BufReader, Error};
 
 #[derive(Serialize)]
 struct Record<'a> {
@@ -32,7 +32,14 @@ fn main() -> Result<()> {
         .map(|service| {
             println!("Retrieving {}", service);
             let docs = retrieve_aws_docs(&client, service)?;
-            let required_props_per_method = analyze_text(&class_selector, &method_selector, &properties_selector, &property_selector, &docs, service)?;
+            let required_props_per_method = analyze_text(
+                &class_selector,
+                &method_selector,
+                &properties_selector,
+                &property_selector,
+                &docs,
+                service,
+            )?;
             write_to_file(service, required_props_per_method)?;
             Ok(())
         })
@@ -58,27 +65,42 @@ fn retrieve_services_from_file() -> Result<Vec<String>, Error> {
 }
 
 fn retrieve_aws_docs(client: &Client, service: &str) -> Result<String> {
-    let url = format!("https://docs.rs/aws-sdk-{}/1.18.0/aws_sdk_{}/client/struct.Client.html", service, service);
-    let result = client.get(&url)
+    let url = format!(
+        "https://docs.rs/aws-sdk-{}/1.18.0/aws_sdk_{}/client/struct.Client.html",
+        service, service
+    );
+    let result = client
+        .get(&url)
         .send()
         .with_context(|| format!("call to url {} for {} failed", &url, service))?;
-    Ok(result.text()
+    Ok(result
+        .text()
         .with_context(|| format!("call to get text for url {} for {} failed", &url, service))?)
 }
 
 fn sanitize_property(prop_name: String) -> String {
-    prop_name.split("(").next()
+    prop_name
+        .split("(")
+        .next()
         .expect("Split to always have at least one element")
         .to_string()
 }
 
-fn analyze_text<'a>(class_selector: &Selector, method_selector: &Selector, properties_selector: &Selector, property_selector: &Selector, docs: &String, service: &'a str) -> Result<Vec<Record<'a>>> {
+fn analyze_text<'a>(
+    class_selector: &Selector,
+    method_selector: &Selector,
+    properties_selector: &Selector,
+    property_selector: &Selector,
+    docs: &String,
+    service: &'a str,
+) -> Result<Vec<Record<'a>>> {
     let document = Html::parse_document(&docs);
 
     let mut required_props_per_method = vec![];
 
     for element in document.select(class_selector) {
-        let method_name = element.select(method_selector)
+        let method_name = element
+            .select(method_selector)
             .next()
             .with_context(|| format!("failed to find method name for {}", service))?
             .inner_html();
@@ -87,7 +109,8 @@ fn analyze_text<'a>(class_selector: &Selector, method_selector: &Selector, prope
         for property in element.select(properties_selector) {
             if property.inner_html().contains("required: <strong>true</strong>") {
                 // the other <code> contents are things like set_queue_url, which might also be useful, but ignoring for now
-                let property_name = property.select(property_selector)
+                let property_name = property
+                    .select(property_selector)
                     .next()
                     .with_context(|| format!("failed to find the property name for {}", service))?;
                 property_names.push(sanitize_property(property_name.inner_html()));
@@ -113,7 +136,8 @@ fn write_to_file(service: &str, required_props_per_method: Vec<Record>) -> Resul
         .with_context(|| format!("failed to created writer for {}", &service))?;
 
     for el in required_props_per_method {
-        writer.serialize(el)
+        writer
+            .serialize(el)
             .with_context(|| format!("failed to write record for {}", &service))?;
     }
 

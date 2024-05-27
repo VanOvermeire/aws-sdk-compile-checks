@@ -1,8 +1,8 @@
 use std::collections::{HashMap, HashSet};
 
 use proc_macro2::{Ident, Span};
-use syn::{Expr, ExprMethodCall, FnArg, ItemFn, Local, Member, Pat, Signature, Type, visit};
 use syn::visit::Visit;
+use syn::{visit, Expr, ExprMethodCall, FnArg, ItemFn, Local, Member, Pat, Signature, Type};
 
 use crate::required_properties::RequiredPropertiesMap;
 
@@ -92,7 +92,14 @@ impl MethodVisitor {
                 .collect();
 
             if let Some(receiver) = &sdk_function_call.receiver {
-                if !self.clients.is_empty() && !self.clients.iter().filter_map(|c| c.name.to_owned()).collect::<Vec<String>>().contains(&&receiver.to_string()) {
+                if !self.clients.is_empty()
+                    && !self
+                        .clients
+                        .iter()
+                        .filter_map(|c| c.name.to_owned())
+                        .collect::<Vec<String>>()
+                        .contains(&&receiver.to_string())
+                {
                     // we have clients and none of them match the receiver, meaning this probably isn't a relevant function
                     skip_until_relevant_function_call.drain(0..arguments_for_function.len());
                     initial = skip_until_relevant_function_call;
@@ -100,19 +107,18 @@ impl MethodVisitor {
                 }
             }
 
-            let required_props_for_this_method =
-                match self.get_required_props_for(sdk_function_call, &mut selected_sdks) {
-                    Ok(required) => required,
-                    Err(sdks) => {
-                        // could not find the _right_ props, gather what we already have and break
-                        results.push(UsageFinds::Unknown(UnknownUsage {
-                            span: sdk_function_call.method_call.span(),
-                            method: sdk_function_call.method_call.to_string(),
-                            sdks,
-                        }));
-                        return results;
-                    }
-                };
+            let required_props_for_this_method = match self.get_required_props_for(sdk_function_call, &mut selected_sdks) {
+                Ok(required) => required,
+                Err(sdks) => {
+                    // could not find the _right_ props, gather what we already have and break
+                    results.push(UsageFinds::Unknown(UnknownUsage {
+                        span: sdk_function_call.method_call.span(),
+                        method: sdk_function_call.method_call.to_string(),
+                        sdks,
+                    }));
+                    return results;
+                }
+            };
 
             // now we can compare our required arguments with the real arguments. if one of the required 'check' values is not present, we have a problem
             let missing_required_args: Vec<_> = required_props_for_this_method
@@ -137,7 +143,11 @@ impl MethodVisitor {
         results
     }
 
-    fn get_required_props_for<'a>(&self, function_call: &MethodCallWithReceiver, selected_sdks: &mut Vec<String>) -> Result<Vec<&'a str>, Vec<String>> {
+    fn get_required_props_for<'a>(
+        &self,
+        function_call: &MethodCallWithReceiver,
+        selected_sdks: &mut Vec<String>,
+    ) -> Result<Vec<&'a str>, Vec<String>> {
         let hashmaps_with_required_props = self
             .required_props
             .get::<str>(function_call.method_call.to_string().as_ref())
@@ -156,8 +166,8 @@ impl MethodVisitor {
                 Ok(required_props)
             } else {
                 if !selected_sdks.is_empty() {
-
-                    let mut results: Vec<(&String, &Vec<&str>)> = selected_sdks.iter()
+                    let mut results: Vec<(&String, &Vec<&str>)> = selected_sdks
+                        .iter()
                         .filter_map(|sdk| hashmaps_with_required_props.get(&sdk.as_ref()).map(|result| (sdk, result)))
                         .collect::<Vec<_>>();
 
@@ -178,19 +188,26 @@ impl MethodVisitor {
                     }
                 }
 
-                let mut client_results: Vec<(&Client, Vec<&str>)> = self.clients
+                let mut client_results: Vec<(&Client, Vec<&str>)> = self
+                    .clients
                     .iter()
-                    .filter_map(|c| self.find_required_props_for_client(hashmaps_with_required_props, c).map(|result| (c, result)))
+                    .filter_map(|c| {
+                        self.find_required_props_for_client(hashmaps_with_required_props, c)
+                            .map(|result| (c, result))
+                    })
                     .collect();
 
                 if !client_results.is_empty() {
                     if client_results.len() > 1 && function_call.receiver.is_some() {
                         // this could hopefully be nicer
-                        let client_that_matches_receiver_or_default = client_results.iter()
+                        let client_that_matches_receiver_or_default = client_results
+                            .iter()
                             .find(|c| {
                                 c.0.name.is_some() && c.0.name.as_ref().unwrap().eq(&function_call.receiver.as_ref().unwrap().to_string())
-                            }).map(|c| c.clone())
-                            .unwrap_or_else(|| client_results.pop().unwrap()).1;
+                            })
+                            .map(|c| c.clone())
+                            .unwrap_or_else(|| client_results.pop().unwrap())
+                            .1;
                         Ok(client_that_matches_receiver_or_default)
                     } else {
                         Ok(client_results.pop().unwrap().1)
@@ -210,27 +227,33 @@ impl MethodVisitor {
         }
     }
 
-    fn find_required_props_for_client<'a>(&self, hashmaps_with_required_props: &HashMap<&'a str, Vec<&'a str>>, client: &Client) -> Option<Vec<&'a str>> {
+    fn find_required_props_for_client<'a>(
+        &self,
+        hashmaps_with_required_props: &HashMap<&'a str, Vec<&'a str>>,
+        client: &Client,
+    ) -> Option<Vec<&'a str>> {
         match client {
-            Client { sdk: Some(sdk), .. } if hashmaps_with_required_props.contains_key(&sdk.to_string().as_ref()) => {
-                Some(hashmaps_with_required_props
+            Client { sdk: Some(sdk), .. } if hashmaps_with_required_props.contains_key(&sdk.to_string().as_ref()) => Some(
+                hashmaps_with_required_props
                     .get(&sdk.to_string().as_ref())
                     .expect("just checked that this key is present")
-                    .to_owned())
-            }
+                    .to_owned(),
+            ),
             Client { name: Some(name), .. } => {
                 let sdk = try_to_get_sdk_from_name(name);
 
                 if hashmaps_with_required_props.contains_key(&sdk.as_ref()) {
-                    Some(hashmaps_with_required_props
-                        .get(&sdk.as_ref())
-                        .expect("just checked that this key is present")
-                        .to_owned())
+                    Some(
+                        hashmaps_with_required_props
+                            .get(&sdk.as_ref())
+                            .expect("just checked that this key is present")
+                            .to_owned(),
+                    )
                 } else {
                     None
                 }
             }
-            _ => None
+            _ => None,
         }
     }
 }
@@ -299,7 +322,8 @@ impl<'ast> Visit<'ast> for MethodVisitor {
 
                             if segments.contains(&"Client".to_string()) {
                                 // this might be an AWS client, retrieve the name and look for the SDK
-                                let aws_sdk = segments.iter()
+                                let aws_sdk = segments
+                                    .iter()
                                     .find(|s| s.contains(AWS_SDK_PREFIX))
                                     .map(|s| s.replace(AWS_SDK_PREFIX, "").to_string());
                                 let name = match &node.pat {
@@ -370,9 +394,9 @@ mod test {
 
     use proc_macro2::{Ident, Span};
     use quote::quote;
+    use syn::visit::Visit;
     use syn::Expr::MethodCall;
     use syn::Stmt;
-    use syn::visit::Visit;
 
     use crate::visitor::{analyze_signature, Client, ImproperUsage, MethodCallWithReceiver, MethodVisitor, UsageFinds};
 
@@ -428,7 +452,7 @@ mod test {
             vec![MethodCallWithReceiver {
                 method_call: Ident::new("to_string", Span::call_site()),
                 receiver: Some(Ident::new("some_thing", Span::call_site())),
-            }, ]
+            },]
         );
     }
 

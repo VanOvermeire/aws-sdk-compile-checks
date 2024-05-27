@@ -37,9 +37,7 @@ fn create_required_props_for(props: &'static str) -> RequiredPropertiesMap {
 }
 
 pub fn valid_sdks(required_props: &RequiredPropertiesMap, selected_sdks: &[String]) -> Result<(), String> {
-    let service_names: Vec<_> = required_props.values()
-        .flat_map(|v| v.keys())
-        .collect();
+    let service_names: Vec<_> = required_props.values().flat_map(|v| v.keys()).collect();
     let not_found: Vec<String> = selected_sdks
         .iter()
         .map(|s| s.to_string())
