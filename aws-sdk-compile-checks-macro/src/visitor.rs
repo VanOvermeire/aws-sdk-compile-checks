@@ -1,10 +1,10 @@
 use std::collections::{HashMap, HashSet};
 
-use proc_macro2::{Ident};
+use proc_macro2::Ident;
 use syn::{Expr, ExprMethodCall, FnArg, ItemFn, Local, Member, Pat, Signature, Type, visit};
 use syn::visit::Visit;
-use crate::findings::{ImproperUsage, UnknownUsage, UsageFinds};
 
+use crate::findings::{ImproperUsage, UnknownUsage, UsageFinds};
 use crate::required_properties::RequiredPropertiesMap;
 
 const AWS_SDK_SEND: &str = "send"; // terminates calls to AWS in the SDK
@@ -146,11 +146,11 @@ impl MethodVisitor {
 
         if hashmaps_with_required_props.keys().len() == 1 {
             return Ok((
-                hashmaps_with_required_props.keys().next().unwrap().to_string(),
+                hashmaps_with_required_props.keys().next().expect("just checked that there is at least one key").to_string(),
                 hashmaps_with_required_props
                     .values()
                     .next()
-                    .expect("just checked that there is a key")
+                    .expect("just checked that there is a key, so should also be a value")
                     .to_owned()
             ));
         }
@@ -218,11 +218,9 @@ impl MethodVisitor {
                 // this could hopefully be nicer
                 let client_that_matches_receiver_or_default = client_results
                     .iter()
-                    .find(|c| {
-                        c.0.name.is_some() && c.0.name.as_ref().unwrap().eq(&function_call.receiver.as_ref().unwrap().to_string())
-                    })
+                    .find(|c| c.0.name.is_some() && c.0.name.as_ref().expect("checked that there is a name").eq(&function_call.receiver.as_ref().expect("checked that there is a receiver").to_string()))
                     .cloned()
-                    .unwrap_or_else(|| client_results.pop().unwrap());
+                    .unwrap_or_else(|| client_results.pop().expect("just checked that there is at least one client result"));
                 let client = client_that_matches_receiver_or_default.0;
                 let sdk = try_to_get_sdk_from_client(client);
 
