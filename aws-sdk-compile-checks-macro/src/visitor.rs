@@ -1,8 +1,9 @@
 use std::collections::{HashMap, HashSet};
 
-use proc_macro2::{Ident, Span};
+use proc_macro2::{Ident};
 use syn::{Expr, ExprMethodCall, FnArg, ItemFn, Local, Member, Pat, Signature, Type, visit};
 use syn::visit::Visit;
+use crate::findings::{ImproperUsage, UnknownUsage, UsageFinds};
 
 use crate::required_properties::RequiredPropertiesMap;
 
@@ -14,27 +15,6 @@ pub(crate) struct MethodVisitor {
     clients: HashSet<Client>,
     method_calls: Vec<MethodCallWithReceiver>,
     required_props: RequiredPropertiesMap,
-}
-
-#[derive(Debug)]
-pub(crate) enum UsageFinds {
-    Improper(ImproperUsage),
-    Unknown(UnknownUsage),
-}
-
-#[derive(Debug)]
-pub(crate) struct UnknownUsage {
-    pub(crate) span: Span,
-    pub(crate) method: String,
-    pub(crate) sdks: Vec<String>,
-}
-
-#[derive(Debug)]
-pub(crate) struct ImproperUsage {
-    pub(crate) span: Span,
-    pub(crate) method: String,
-    pub(crate) missing: Vec<String>,
-    pub(crate) sdk: String,
 }
 
 #[derive(Debug, PartialEq)]
