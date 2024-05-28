@@ -40,7 +40,6 @@ impl MethodVisitor {
         visitor
     }
 
-    // TODO some additional tests
     pub(crate) fn find_improper_usages(&self, mut selected_sdks: Vec<String>) -> Vec<UsageFinds> {
         let mut initial: Vec<_> = self.method_calls.iter().rev().collect();
         let mut results: Vec<UsageFinds> = vec![];
@@ -184,7 +183,7 @@ impl MethodVisitor {
 
             if let Some(found) = results.pop() {
                 return Ok((
-                    selected_sdks.first().expect("called after is_empty check").to_string(),
+                    found.0.to_owned(),
                     found.1.to_owned()
                 ));
             }
@@ -641,7 +640,7 @@ mod test {
     #[test]
     fn get_required_props_for_only_one_match() {
         let mut required_props = HashMap::new();
-        required_props.insert("some_call", HashMap::from([("s3", vec!["required_call"])]));
+        required_props.insert("some_call", HashMap::from([("s3", vec!["required_prop"])]));
         let visitor = MethodVisitor {
             clients: HashSet::new(),
             method_calls: vec![],
@@ -654,7 +653,7 @@ mod test {
 
         let actual = visitor.get_required_props_for(&call, &mut vec![]).unwrap();
 
-        assert_eq!(actual, ("s3".to_string(), vec!["required_call"]));
+        assert_eq!(actual, ("s3".to_string(), vec!["required_prop"]));
     }
 
     #[test]
@@ -662,7 +661,7 @@ mod test {
         let mut required_props = HashMap::new();
         required_props.insert(
             "some_call",
-            HashMap::from([("s3", vec!["required_call"]), ("sqs", vec!["required_call"])]),
+            HashMap::from([("s3", vec!["required_prop"]), ("sqs", vec!["required_prop"])]),
         );
         let visitor = MethodVisitor {
             clients: HashSet::new(),
@@ -676,7 +675,7 @@ mod test {
 
         let actual = visitor.get_required_props_for(&call, &mut vec![]).unwrap();
 
-        assert_eq!(actual, ("s3,sqs".to_string(), vec!["required_call"]));
+        assert_eq!(actual, ("s3,sqs".to_string(), vec!["required_prop"]));
     }
 
     #[test]
@@ -684,7 +683,7 @@ mod test {
         let mut required_props = HashMap::new();
         required_props.insert(
             "some_call",
-            HashMap::from([("s3", vec!["required_call"]), ("sqs", vec!["different_call"])]),
+            HashMap::from([("s3", vec!["s3_required_prop"]), ("sqs", vec!["sqs_required_prop"])]),
         );
         let visitor = MethodVisitor {
             clients: HashSet::from([Client {
@@ -701,7 +700,7 @@ mod test {
 
         let actual = visitor.get_required_props_for(&call, &mut vec![]).unwrap();
 
-        assert_eq!(actual, ("sqs".to_string(), vec!["different_call"]));
+        assert_eq!(actual, ("sqs".to_string(), vec!["sqs_required_prop"]));
     }
 
     #[test]
@@ -709,7 +708,7 @@ mod test {
         let mut required_props = HashMap::new();
         required_props.insert(
             "some_call",
-            HashMap::from([("s3", vec!["required_call"]), ("sqs", vec!["different_call"])]),
+            HashMap::from([("s3", vec!["s3_required_prop"]), ("sqs", vec!["sqs_required_prop"])]),
         );
         let visitor = MethodVisitor {
             clients: HashSet::from([Client {
@@ -726,7 +725,7 @@ mod test {
 
         let actual = visitor.get_required_props_for(&call, &mut vec![]).unwrap();
 
-        assert_eq!(actual, ("sqs".to_string(), vec!["different_call"]));
+        assert_eq!(actual, ("sqs".to_string(), vec!["sqs_required_prop"]));
     }
 
     #[test]
@@ -734,7 +733,7 @@ mod test {
         let mut required_props = HashMap::new();
         required_props.insert(
             "some_call",
-            HashMap::from([("s3", vec!["required_call"]), ("sqs", vec!["different_call"])]),
+            HashMap::from([("s3", vec!["s3_required_prop"]), ("sqs", vec!["sqs_required_prop"])]),
         );
         let visitor = MethodVisitor {
             clients: HashSet::from([Client {
@@ -751,7 +750,78 @@ mod test {
 
         let actual = visitor.get_required_props_for(&call, &mut vec![]).unwrap();
 
-        assert_eq!(actual, ("sqs".to_string(), vec!["different_call"]));
+        assert_eq!(actual, ("sqs".to_string(), vec!["sqs_required_prop"]));
+    }
+
+    #[test]
+    fn get_required_props_for_two_different_matches_uses_receiver_over_client() {
+        let mut required_props = HashMap::new();
+        required_props.insert(
+            "some_call",
+            HashMap::from([("s3", vec!["s3_required_prop"]), ("sqs", vec!["sqs_required_prop"])]),
+        );
+        let visitor = MethodVisitor {
+            clients: HashSet::from([Client {
+                name: Some("sqs".to_string()),
+                sdk: None,
+            }]),
+            method_calls: vec![],
+            required_props,
+        };
+        let call = MethodCallWithReceiver {
+            method_call: Ident::new("some_call", Span::call_site()),
+            receiver: Some(Ident::new("s3_client", Span::call_site())),
+        };
+
+        let actual = visitor.get_required_props_for(&call, &mut vec![]).unwrap();
+
+        assert_eq!(actual, ("s3".to_string(), vec!["s3_required_prop"]));
+    }
+
+    #[test]
+    fn get_required_props_for_two_different_matches_pick_selected_sdk() {
+        let mut selected_sdks = vec!["another".to_string(), "sqs".to_string()];
+        let mut required_props = HashMap::new();
+        required_props.insert(
+            "some_call",
+            HashMap::from([("s3", vec!["s3_required_prop"]), ("sqs", vec!["sqs_required_prop"])]),
+        );
+        let visitor = MethodVisitor {
+            clients: HashSet::from([]),
+            method_calls: vec![],
+            required_props,
+        };
+        let call = MethodCallWithReceiver {
+            method_call: Ident::new("some_call", Span::call_site()),
+            receiver: None,
+        };
+
+        let actual = visitor.get_required_props_for(&call, &mut selected_sdks).unwrap();
+
+        assert_eq!(actual, ("sqs".to_string(), vec!["sqs_required_prop"]));
+    }
+
+    #[test]
+    fn get_required_props_for_two_different_matches_pick_selected_sdk_with_retriever_as_tie_breaker() {
+        let mut selected_sdks = vec!["s3".to_string(), "sqs".to_string()];
+        let mut required_props = HashMap::new();
+        required_props.insert(
+            "some_call",
+            HashMap::from([("s3", vec!["required_prop"]), ("sqs", vec!["required_prop"]), ("ses", vec!["ses_required_prop"])]),
+        );
+        let visitor = MethodVisitor {
+            clients: HashSet::from([]),
+            method_calls: vec![],
+            required_props,
+        };
+        let call = MethodCallWithReceiver {
+            method_call: Ident::new("some_call", Span::call_site()),
+            receiver: Some(Ident::new("s3_client", Span::call_site())),
+        };
+
+        let actual = visitor.get_required_props_for(&call, &mut selected_sdks).unwrap();
+
+        assert_eq!(actual, ("s3".to_string(), vec!["required_prop"]));
     }
 
     #[test]
