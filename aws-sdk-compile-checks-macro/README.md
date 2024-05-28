@@ -9,7 +9,7 @@ With this macro, we shift to the left, failing at compile time.
 
 Add the macro to your dependencies with the following command:
 
-```
+```ignore
 cargo add aws-sdk-compile-checks
 ```
 
@@ -19,17 +19,19 @@ After adding the crate to your dependencies, you can use the `#[required_props]`
 
 For example:
 
-```rust
+```rust ignore
+use aws_sdk_compile_checks_macro::required_props;
+use aws_sdk_sqs::config::BehaviorVersion;
+
 #[required_props]
-async fn example() -> Result<()> {
+async fn example() -> Result<(), String> {
     let aws_config = aws_config::load_defaults(BehaviorVersion::latest()).await;
     let sqs_client = aws_sdk_sqs::Client::new(&aws_config);
     sqs_client.send_message()
         // missing queue url
-        .message_body(create_message())
+        .message_body("some message")
         .send()
-        .await
-        .with_context(|| "call to sqs failed")?;
+        .await;
     Ok(())
 }
 ```
@@ -39,6 +41,9 @@ In the above example, you will get a compile time error complaining that `queue_
 You can also add the attribute to `impl` blocks. The following example will compile since it has all the required properties:
 
 ```rust
+use aws_sdk_compile_checks_macro::required_props;
+use aws_sdk_sqs::Client;
+
 struct AwsClientPrefix {
     sqs_client: Client,
 }
@@ -58,9 +63,16 @@ impl AwsClientPrefix {
 You can specify SDKs. This might speed up the search process a little bit.
 
 ```rust
+use aws_sdk_compile_checks_macro::required_props;
+use aws_sdk_sqs::Client;
+
 #[required_props(sdk = sqs)]
-async fn do_call() -> Result<()> {
-    // same content
+async fn do_call(sqs_client: Client) {
+    let _ = sqs_client
+        .receive_message()
+        .queue_url("something")
+        .send()
+        .await;
 }
 ```
 
@@ -96,10 +108,8 @@ Pull requests, comments, suggestions... are welcome.
 
 ## TODO
 
-- Inline documentation
 - Less owning of stuff
-- Refactoring of internals
-- Get rid of unwraps
+- Some refactoring
 
 ## Crates that are not yet included
 

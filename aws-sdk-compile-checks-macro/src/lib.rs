@@ -1,3 +1,4 @@
+#![doc = include_str!("../README.md")]
 use proc_macro::TokenStream;
 
 use quote::quote;
@@ -12,6 +13,18 @@ mod required_properties;
 mod visitor;
 mod findings;
 
+/// Adding this attribute to a function or method will make it check for AWS SDK calls that are missing required properties
+/// (properties that, if missing, would cause a panic at runtime)
+/// Example:
+/// ```rust
+/// use aws_sdk_compile_checks_macro::required_props;
+///
+/// #[required_props]
+/// fn some_function() {
+///     // instantiate an AWS client
+///     // will check the calls it makes for missing required properties
+/// }
+/// ```
 #[proc_macro_attribute]
 pub fn required_props(attrs: TokenStream, input: TokenStream) -> TokenStream {
     let attributes: Attributes = parse_macro_input!(attrs);

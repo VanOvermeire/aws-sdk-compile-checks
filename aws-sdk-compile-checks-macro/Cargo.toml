@@ -10,3 +10,7 @@ syn = {  version = "2.0.57", features = ["full", "extra-traits", "visit"] }
 
 [lib]
 proc-macro = true
+
+[dev-dependencies]
+aws-config = "1.5.0"
+aws-sdk-sqs = "1.27.0"
