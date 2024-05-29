@@ -3,10 +3,16 @@ name = "aws-sdk-compile-checks-macro"
 version = "0.1.0"
 edition = "2021"
 
+description = "Macros that add compile time checks to the AWS SDKs"
+license = "MIT NON-AI"
+homepage = "https://github.com/VanOvermeire/aws-sdk-compile-checks"
+repository = "https://github.com/VanOvermeire/aws-sdk-compile-checks"
+keywords = ["AWS", "required", "macro", "checks"]
+
 [dependencies]
 proc-macro2 = "1.0.79"
 quote = "1.0.35"
-syn = {  version = "2.0.57", features = ["full", "extra-traits", "visit"] }
+syn = {  version = "2.0.57", features = ["full", "visit"] }
 
 [lib]
 proc-macro = true
