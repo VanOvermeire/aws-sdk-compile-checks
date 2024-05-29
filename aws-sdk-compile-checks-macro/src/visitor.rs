@@ -651,7 +651,7 @@ mod test {
             receiver: None,
         };
 
-        let actual = visitor.get_required_props_for(&call, &mut vec![]).unwrap();
+        let actual = visitor.get_required_props_for(&call, &mut []).unwrap();
 
         assert_eq!(actual, ("s3".to_string(), vec!["required_prop"]));
     }
@@ -673,7 +673,7 @@ mod test {
             receiver: None,
         };
 
-        let actual = visitor.get_required_props_for(&call, &mut vec![]).unwrap();
+        let actual = visitor.get_required_props_for(&call, &mut []).unwrap();
 
         assert_eq!(actual, ("s3,sqs".to_string(), vec!["required_prop"]));
     }
@@ -698,7 +698,7 @@ mod test {
             receiver: None,
         };
 
-        let actual = visitor.get_required_props_for(&call, &mut vec![]).unwrap();
+        let actual = visitor.get_required_props_for(&call, &mut []).unwrap();
 
         assert_eq!(actual, ("sqs".to_string(), vec!["sqs_required_prop"]));
     }
@@ -723,7 +723,7 @@ mod test {
             receiver: None,
         };
 
-        let actual = visitor.get_required_props_for(&call, &mut vec![]).unwrap();
+        let actual = visitor.get_required_props_for(&call, &mut []).unwrap();
 
         assert_eq!(actual, ("sqs".to_string(), vec!["sqs_required_prop"]));
     }
@@ -748,7 +748,7 @@ mod test {
             receiver: None,
         };
 
-        let actual = visitor.get_required_props_for(&call, &mut vec![]).unwrap();
+        let actual = visitor.get_required_props_for(&call, &mut []).unwrap();
 
         assert_eq!(actual, ("sqs".to_string(), vec!["sqs_required_prop"]));
     }
@@ -773,7 +773,7 @@ mod test {
             receiver: Some(Ident::new("s3_client", Span::call_site())),
         };
 
-        let actual = visitor.get_required_props_for(&call, &mut vec![]).unwrap();
+        let actual = visitor.get_required_props_for(&call, &mut []).unwrap();
 
         assert_eq!(actual, ("s3".to_string(), vec!["s3_required_prop"]));
     }

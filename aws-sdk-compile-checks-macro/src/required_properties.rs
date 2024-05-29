@@ -77,7 +77,7 @@ mod tests {
         required_props.insert("something", HashMap::from([("s3", vec!["required_call"])]));
         required_props.insert("something_else", HashMap::from([("sqs", vec!["required_call"])]));
 
-        let actual = valid_sdks(&required_props, &vec!["s3".to_string(), "sns".to_string()]).unwrap_err();
+        let actual = valid_sdks(&required_props, &["s3".to_string(), "sns".to_string()]).unwrap_err();
 
         assert_eq!(actual, "sns".to_string());
     }
