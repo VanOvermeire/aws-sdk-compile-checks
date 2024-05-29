@@ -110,6 +110,7 @@ Pull requests, comments, suggestions... are welcome.
 
 - Less owning of stuff
 - Some refactoring
+- Set up GitHub actions checks
 
 ## Crates that are not yet included
 
