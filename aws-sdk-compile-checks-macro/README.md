@@ -111,6 +111,7 @@ Pull requests, comments, suggestions... are welcome.
 - Less owning of stuff
 - Some refactoring
 - Set up GitHub actions checks
+- Pick another example sdk in 'usage' that's faster than sagemaker?
 
 ## Crates that are not yet included
 
