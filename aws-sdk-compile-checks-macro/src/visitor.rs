@@ -336,6 +336,7 @@ impl<'ast> Visit<'ast> for MethodVisitor {
 
     fn visit_local(&mut self, node: &'ast Local) {
         if let Some(init) = &node.init {
+            #[allow(clippy::single_match)] // because I might want to expand on this in the future
             match init.expr.as_ref() {
                 Expr::Call(call) => {
                     match call.func.as_ref() {

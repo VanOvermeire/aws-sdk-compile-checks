@@ -1,0 +1,43 @@
+name: AWS SDK Compile Checks
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - master
+
+env:
+  PROJECT_NAME: aws-sdk-compile-checks
+
+jobs:
+  clippy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository code
+        uses: actions/checkout@v3
+      - name: Run clippy with additional denies
+        run: cargo clippy -- -D clippy::style -D clippy::suspicious
+
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository code
+        uses: actions/checkout@v3
+      - name: Run all tests
+        run: cargo test
+
+#  publish:
+#    needs:
+#      - clippy
+#      - test
+#    runs-on: ubuntu-latest
+#    steps:
+#      - name: Check out repository code
+#        uses: actions/checkout@v3
+#      - name: Login to Cargo
+#        uses: actions-rs/cargo@v1
+#        with:
+#          command: login
+#          args: ${{ secrets.CRATES_API_TOKEN }}
+#      - name: Publish to Cargo
+#        run: cargo publish
+#        working-directory: aws-sdk-compile-checks-macro # only interested in the macro
