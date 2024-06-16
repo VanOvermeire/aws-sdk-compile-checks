@@ -2,7 +2,7 @@
 
 Checks for the presence of required attributes when using calling AWS SDK client methods for some 300 AWS crates and 9000 methods.
 
-By default, the AWS SDK will panic at runtime when required properties are missing.
+By default, the AWS SDK will error at runtime when required properties are missing.
 With this macro, we shift to the left, failing at compile time.
 
 ## Install
