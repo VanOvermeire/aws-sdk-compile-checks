@@ -5,6 +5,7 @@ edition = "2021"
 
 [dependencies]
 aws-sdk-compile-checks-macro = { path = "../aws-sdk-compile-checks-macro" }
+aws-config = "1.5.17"
 aws-sdk-sqs = "1.60.0"
 aws-sdk-dynamodb = "1.66.0"
 aws-sdk-rekognition = "1.63.0"
