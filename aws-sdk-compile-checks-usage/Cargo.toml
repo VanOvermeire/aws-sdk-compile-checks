@@ -5,13 +5,13 @@ edition = "2021"
 
 [dependencies]
 aws-sdk-compile-checks-macro = { path = "../aws-sdk-compile-checks-macro" }
-aws-config = "1.1.8"
-aws-sdk-sqs = "1.9.0"
-aws-sdk-dynamodb = "1.28.0"
-aws-sdk-sagemaker = "1.43.0"
-aws-sdk-evidently = "1.25.0"
+aws-sdk-sqs = "1.60.0"
+aws-sdk-dynamodb = "1.66.0"
+aws-sdk-rekognition = "1.63.0"
+aws-sdk-iam = "1.63.0"
+aws-sdk-evidently = "1.60.0"
 
 [dev-dependencies]
 trybuild = "1.0.91"
-aws-sdk-lambda = "1.20.0"
-aws-sdk-amplify = "1.20.0"
+aws-sdk-lambda = "1.70.0"
+aws-sdk-amplify = "1.66.0"

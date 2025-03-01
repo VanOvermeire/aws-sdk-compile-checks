@@ -8,6 +8,8 @@ use serde::Serialize;
 use std::fs::File;
 use std::io::{BufRead, BufReader, Error};
 
+const AWS_SDK_VERSION: &str = "latest"; // alternatively, pick a concrete version, i.e. "1.18.0"
+
 #[derive(Serialize)]
 struct Record<'a> {
     service: &'a str,
@@ -66,8 +68,8 @@ fn retrieve_services_from_file() -> Result<Vec<String>, Error> {
 
 fn retrieve_aws_docs(client: &Client, service: &str) -> Result<String> {
     let url = format!(
-        "https://docs.rs/aws-sdk-{}/1.18.0/aws_sdk_{}/client/struct.Client.html",
-        service, service
+        "https://docs.rs/aws-sdk-{}/{}/aws_sdk_{}/client/struct.Client.html",
+        service, AWS_SDK_VERSION, service
     );
     let result = client
         .get(&url)

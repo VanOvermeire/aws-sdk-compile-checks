@@ -109,9 +109,8 @@ Pull requests, comments, suggestions... are welcome.
 ## TODO
 
 - Less owning of stuff
-- Some refactoring
 - Expand GitHub actions
-- Pick another example sdk in 'usage' that's faster than sagemaker?
+- Support methods with no required properties to avoid confusion; see commented-out example in `usage`
 
 ## Crates that are not yet included
 

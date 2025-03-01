@@ -1,8 +1,8 @@
-error: method `create_project` (from sagemaker) is missing required argument(s): `project_name`, `service_catalog_provisioning_details`
- --> tests/fails/multiple_clients_with_issues_same_method_name.rs:8:30
+error: method `create_project` (from rekognition) is missing required argument(s): `project_name`
+ --> tests/fails/multiple_clients_with_issues_same_method_name.rs:8:32
   |
-8 |     let _ = sagemaker_client.create_project()
-  |                              ^^^^^^^^^^^^^^
+8 |     let _ = rekognition_client.create_project()
+  |                                ^^^^^^^^^^^^^^
 
 error: method `create_project` (from evidently) is missing required argument(s): `name`
  --> tests/fails/multiple_clients_with_issues_same_method_name.rs:5:30

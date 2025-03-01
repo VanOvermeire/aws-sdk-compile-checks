@@ -4,7 +4,6 @@
 use aws_config::BehaviorVersion;
 use aws_sdk_compile_checks_macro::required_props;
 use aws_sdk_dynamodb::types::Replica;
-use aws_sdk_sagemaker::types::ServiceCatalogProvisioningDetails;
 use aws_sdk_sqs::Client;
 
 // these are normal functions and should not error
@@ -157,29 +156,41 @@ async fn dynamo_and_sqs(sqs_client: aws_sdk_sqs::Client, dynamodb_client: aws_sd
 }
 
 #[required_props]
-async fn evidently_and_sagemaker(evidently_client: aws_sdk_evidently::Client, sagemaker_client: aws_sdk_sagemaker::Client) {
+async fn evidently_and_rekognition(evidently_client: aws_sdk_evidently::Client, rekognition_client: aws_sdk_rekognition::Client) {
     let _ = evidently_client.create_project().name("name").send().await;
-    let _ = sagemaker_client
+    let _ = rekognition_client
         .create_project()
         .project_name("name")
-        .service_catalog_provisioning_details(ServiceCatalogProvisioningDetails::builder().build())
         .send()
         .await;
 }
 
-#[required_props(sdk = evidently,sagemaker)]
-async fn evidently_and_sagemaker_with_selected_sdks(
+#[required_props(sdk = evidently,rekognition)]
+async fn evidently_and_rekognition_with_selected_sdks(
     evidently_client: aws_sdk_evidently::Client,
-    sagemaker_client: aws_sdk_sagemaker::Client,
+    rekognition_client: aws_sdk_rekognition::Client,
 ) {
     let _ = evidently_client.create_project().name("name").send().await;
-    let _ = sagemaker_client
+    let _ = rekognition_client
         .create_project()
         .project_name("name")
-        .service_catalog_provisioning_details(ServiceCatalogProvisioningDetails::builder().build())
         .send()
         .await;
 }
+
+// TODO fails because there are no required properties for this call
+//  but the fact that it is not found is confusing - would be nice to fix this
+// #[required_props(sdk = iam)]
+// async fn get_current_user(iam_client: aws_sdk_iam::Client) {
+//     let user_arn = iam_client
+//         .get_user()
+//         .send()
+//         .await
+//         .unwrap()
+//         .user
+//         .unwrap()
+//         .arn;
+// }
 
 // ideally, this would not cause a compile error (though on the other hand, why add the attribute to a call that is not an SDK call?)
 
