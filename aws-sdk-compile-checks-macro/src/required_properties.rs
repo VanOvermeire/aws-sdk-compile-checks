@@ -57,22 +57,33 @@ mod tests {
 
     #[test]
     fn test_create_required_props_creates_hashmap_with_entries_by_method_name_containing_hashmaps_by_service_key() {
-        let props = "s3,write,bucket object\ns3,associate,account_arn\ns3control,associate,account_id identity_center_arn";
+        let props = "s3,write,bucket object\ns3,associate,account_arn\ns3control,associate,account_id identity_center_arn\niam,get_user,";
 
         let checks = create_required_props_for(props);
 
-        assert_eq!(checks.keys().count(), 2);
+        assert_eq!(checks.keys().count(), 3);
         let write = checks.get("write").unwrap();
         let associate = checks.get("associate").unwrap();
+        let get_user = checks.get("get_user").unwrap();
         assert_eq!(write.keys().count(), 1);
         assert_eq!(write.get("s3"), Some(&vec!["bucket", "object"]));
         assert_eq!(associate.keys().count(), 2);
         assert_eq!(associate.get("s3"), Some(&vec!["account_arn"]));
         assert_eq!(associate.get("s3control"), Some(&vec!["account_id", "identity_center_arn"]));
+        assert_eq!(get_user.get("iam"), Some(&vec![]));
     }
 
     #[test]
-    fn test_not_present_in_required_props() {
+    fn test_present_in_selected_sdks() {
+        let mut required_props = HashMap::new();
+        required_props.insert("something", HashMap::from([("s3", vec!["required_call"])]));
+        required_props.insert("something_else", HashMap::from([("sqs", vec!["required_call"])]));
+
+        valid_sdks(&required_props, &["s3".to_string(), "sqs".to_string()]).unwrap();
+    }
+
+    #[test]
+    fn test_not_present_in_selected_sdks() {
         let mut required_props = HashMap::new();
         required_props.insert("something", HashMap::from([("s3", vec!["required_call"])]));
         required_props.insert("something_else", HashMap::from([("sqs", vec!["required_call"])]));

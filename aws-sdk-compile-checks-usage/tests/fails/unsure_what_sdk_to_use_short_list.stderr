@@ -1,4 +1,4 @@
-error: method `list_artifacts` is used in multiple SDKs: amplify, devicefarm. Please add the right one(s) to the attribute, e.g. `#[required_props(sdk = amplify)]`
+error: method `list_artifacts` is used in multiple SDKs: amplify, devicefarm, sagemaker. Please add the right one(s) to the attribute, e.g. `#[required_props(sdk = amplify)]`
  --> tests/fails/unsure_what_sdk_to_use_short_list.rs:6:12
   |
 6 |     client.list_artifacts()

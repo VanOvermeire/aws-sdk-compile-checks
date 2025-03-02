@@ -119,7 +119,7 @@ fn analyze_text<'a>(
             }
         }
 
-        if !property_names.is_empty() {
+        if !property_names.is_empty() || element.select(properties_selector).count() > 0 {
             required_props_per_method.push(Record {
                 service,
                 method_name,

@@ -178,19 +178,17 @@ async fn evidently_and_rekognition_with_selected_sdks(
         .await;
 }
 
-// TODO fails because there are no required properties for this call
-//  but the fact that it is not found is confusing - would be nice to fix this
-// #[required_props(sdk = iam)]
-// async fn get_current_user(iam_client: aws_sdk_iam::Client) {
-//     let user_arn = iam_client
-//         .get_user()
-//         .send()
-//         .await
-//         .unwrap()
-//         .user
-//         .unwrap()
-//         .arn;
-// }
+#[required_props(sdk = iam)]
+async fn get_current_user(iam_client: aws_sdk_iam::Client) {
+    let user_arn = iam_client
+        .get_user()
+        .send()
+        .await
+        .unwrap()
+        .user
+        .unwrap()
+        .arn;
+}
 
 // ideally, this would not cause a compile error (though on the other hand, why add the attribute to a call that is not an SDK call?)
 
