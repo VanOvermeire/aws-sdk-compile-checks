@@ -140,7 +140,7 @@ dependencies = [
 
 [[package]]
 name = "aws-sdk-compile-checks"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "aws-config",
  "aws-sdk-amplify",
@@ -156,7 +156,7 @@ dependencies = [
 
 [[package]]
 name = "aws-sdk-compile-checks-macro"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "aws-config",
  "aws-sdk-sqs",
@@ -281,7 +281,7 @@ dependencies = [
 
 [[package]]
 name = "aws-sdk-retrieve-required"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "anyhow",
  "csv",
